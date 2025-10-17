@@ -1,0 +1,20 @@
+#!/bin/bash
+# ELIOT Launcher - Works with both regular user and sudo
+
+echo "🚀 ELIOT - AI Pentesting Assistant"
+echo "=================================="
+
+# Check if running with sudo
+if [ "$EUID" -eq 0 ]; then
+    echo "Running with elevated privileges (sudo)"
+    echo "✅ System-wide packages available"
+else
+    echo "Running as regular user"
+fi
+
+echo ""
+echo "Starting ELIOT..."
+echo ""
+
+# Run ELIOT
+python3 main.py

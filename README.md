@@ -1,8 +1,13 @@
-# ELIOT - THE AI HACKER ASSISTANT
+# ELIOT - AI Pentesting Assistant (MCP Version)
+
+**Simplified AI-Driven Pentesting with Kali MCP Server**
+*Powered by Kali Linux MCP Server for maximum tool compatibility*
 
 ## 🚀 **by Bikram@2003**
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
+[![Kali Linux](https://img.shields.io/badge/Kali-2025.3-red.svg)](https://kali.org)
+[![MCP](https://img.shields.io/badge/MCP-Enabled-green.svg)](https://modelcontextprotocol.io)
 [![License](https://img.shields.io/badge/License-Educational-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Kali%20Linux-red.svg)](https://kali.org)
 
@@ -10,7 +15,13 @@
 
 ## 🎯 **Overview**
 
-**ELIOT** is an advanced AI-powered hacker assistant that combines cutting-edge artificial intelligence with traditional penetration testing tools. Built for ethical hackers and security professionals, ELIOT operates in two powerful modes: **Interactive** (chat-based) and **Autonomous** (unattended).
+**ELIOT** is a simplified AI-powered penetration testing assistant that uses the official Kali Linux MCP (Model Context Protocol) server. This approach provides:
+
+- **Simplified Architecture**: Uses official Kali MCP server instead of custom tool wrappers
+- **All Kali Tools Available**: Access to every tool in Kali Linux without manual configuration  
+- **AI-Driven Intelligence**: Natural language understanding with automatic tool selection
+- **Clean Codebase**: Reduced from 600+ lines to ~200 lines of clean, maintainable code
+- **Official Support**: Built on Kali's official MCP implementation
 
 ### **Key Features**
 - 🤖 **AI-Powered Intelligence** - Gemini 2.5 Pro integration
@@ -24,6 +35,15 @@
 ---
 
 ## 🚀 **Quick Start**
+
+### **Running ELIOT**
+```bash
+# Clean interface (recommended - no warnings/errors in chat)
+python3 main.py 2>/dev/null
+
+# Direct execution (with warnings visible)
+python3 main.py
+```
 
 ### **Installation (Kali Linux)**
 ```bash

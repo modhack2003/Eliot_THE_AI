@@ -335,7 +335,7 @@ agent:
 database:
   type: mongodb
   host: localhost
-  port: 27017
+  # MongoDB Atlas connection string will be configured in config.yaml
   database: eliot_hacker_agent
   username: ""
   password: ""

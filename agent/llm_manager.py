@@ -4,6 +4,7 @@ Supports OpenAI, Anthropic, Gemini, and Ollama with automatic failover
 """
 
 import os
+import sys
 import time
 import random
 import logging
@@ -32,7 +33,11 @@ except ImportError:
     ANTHROPIC_AVAILABLE = False
 
 try:
-    import google.generativeai as genai
+    # Suppress warnings before importing Gemini
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        import google.generativeai as genai
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -381,7 +386,7 @@ class LLMManager:
                 raise Exception("No Gemini API keys available")
             api_keys = [api_key]
         
-        # Get the best available API key
+        # Try each available API key, sorted by usage count (least used first)
         current_time = time.time()
         available_keys = []
         
@@ -398,33 +403,51 @@ class LLMManager:
         
         # Sort by usage count (prefer less used keys)
         available_keys.sort(key=lambda x: x[1].usage_count)
-        selected_key = available_keys[0][0]
         
-        try:
-            # Configure with selected key
-            genai.configure(api_key=selected_key)
-            model = genai.GenerativeModel(provider['model'])
+        for key, status in available_keys:
             
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=provider['max_tokens'],
-                    temperature=provider['temperature']
+            try:
+                # Configure with current key (suppress warnings)
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    genai.configure(api_key=key)
+                    model = genai.GenerativeModel(provider['model'])
+                    
+                    response = model.generate_content(
+                        prompt,
+                        generation_config=genai.types.GenerationConfig(
+                            max_output_tokens=provider['max_tokens'],
+                            temperature=provider['temperature']
+                        )
+                    )
+                
+                self._mark_key_used(key, success=True)
+                
+                return LLMResponse(
+                    content=response.text,
+                    provider='gemini',
+                    model=provider['model'],
+                    tokens_used=len(response.text.split())  # Approximate
                 )
-            )
-            
-            self._mark_key_used(selected_key, success=True)
-            
-            return LLMResponse(
-                content=response.text,
-                provider='gemini',
-                model=provider['model'],
-                tokens_used=len(response.text.split())  # Approximate
-            )
-            
-        except Exception as e:
-            self._mark_key_used(selected_key, success=False)
-            raise e
+                
+            except Exception as e:
+                error_msg = str(e)
+                
+                # Check for quota exceeded errors
+                if "quota" in error_msg.lower() or "429" in error_msg:
+                    # Mark key as rate limited for 24 hours
+                    status.rate_limited_until = time.time() + 86400  # 24 hours
+                    self.logger.warning(f"Gemini API key {key[:10]}... quota exceeded, rate limiting for 24 hours")
+                    # Note: Status message will be shown separately in main interface
+                else:
+                    # Regular error, mark as failed
+                    self._mark_key_used(key, success=False)
+                    self.logger.warning(f"Gemini API key {key[:10]}... failed: {e}")
+                
+                continue  # Try next key instead of raising immediately
+        
+        raise Exception("All Gemini API keys failed or are rate limited. Daily quota exceeded for all keys.")
     
     def _call_ollama(self, provider: dict, prompt: str, **kwargs) -> Optional[LLMResponse]:
         """Call Ollama API"""

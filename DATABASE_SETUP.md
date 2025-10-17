@@ -1,26 +1,57 @@
-# Database Setup Guide
+# MongoDB Atlas Setup Guide
 
-## 🗄️ **MongoDB Configuration for Autonomous AI Pentesting Agent**
+## 🗄️ **MongoDB Atlas Configuration for ELIOT AI Pentesting Agent**
 
-The agent requires MongoDB to store experiences, targets, exploits, and learning data. Here are all the ways to configure your database connection:
+ELIOT uses MongoDB Atlas (cloud database) to store experiences, targets, exploits, and learning data. Local MongoDB is not supported.
+
+## Step-by-Step Setup
+
+### **Step 1: Create MongoDB Atlas Account**
+
+1. Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
+2. Create a free account
+3. Create a new cluster:
+   - Choose "M0 Sandbox" (free tier)
+   - Select your preferred cloud provider (AWS, Google Cloud, or Azure)
+   - Choose a region close to your location
+   - Name your cluster (e.g., "eliot-cluster")
+
+### **Step 2: Configure Database Access**
+
+1. Go to "Database Access" in the left sidebar
+2. Click "Add New Database User"
+3. Create a user with:
+   - Username: `eliot_user` (or your preference)
+   - Password: Generate a secure password and save it
+   - Database User Privileges: "Read and write to any database"
+4. Click "Add User"
+
+### **Step 3: Configure Network Access**
+
+1. Go to "Network Access" in the left sidebar
+2. Click "Add IP Address"
+3. For development: Add your current IP address
+4. For production: Add your server's IP address
+5. Or use `0.0.0.0/0` for access from anywhere (less secure)
+6. Click "Confirm"
+
+### **Step 4: Get Connection String**
+
+1. Go to "Clusters" in the left sidebar
+2. Click "Connect" on your cluster
+3. Choose "Connect your application"
+4. Select "Python" and version "3.6 or later"
+5. Copy the connection string (starts with `mongodb+srv://`)
+
+## Configuration Methods
 
 ### **Method 1: Environment Variables (Recommended)**
 
-Set these environment variables before running the agent:
+Set this environment variable before running ELIOT:
 
 ```bash
-# Basic connection
-export MONGODB_HOST=localhost
-export MONGODB_PORT=27017
-export MONGODB_DATABASE=ai_pentesting_agent
-
-# With authentication
-export MONGODB_USERNAME=your_username
-export MONGODB_PASSWORD=your_password
-export MONGODB_AUTH_SOURCE=admin
-
-# Or use full connection string
-export MONGODB_URL="mongodb+srv://bikram20031213:2dYTwXlrYpgpyGxC@cluster0.8zrf3zz.mongodb.net"
+# MongoDB Atlas connection string
+export MONGODB_URL="mongodb+srv://eliot_user:your_password@eliot-cluster.xxxxx.mongodb.net/ai_pentesting_agent?retryWrites=true&w=majority"
 ```
 
 ### **Method 2: Configuration File**
@@ -30,170 +61,130 @@ Edit `config.yaml` and update the database section:
 ```yaml
 database:
   type: mongodb
-  host: localhost
-  port: 27017
+  # MongoDB Atlas connection string (recommended)
+  connection_string: "mongodb+srv://eliot_user:your_password@eliot-cluster.xxxxx.mongodb.net/ai_pentesting_agent?retryWrites=true&w=majority"
+  # Alternative: Individual Atlas parameters
   database: ai_pentesting_agent
-  username: your_username
-  password: your_password
+  username: "eliot_user"
+  password: "your_password"
   auth_source: admin
-  # Or use full connection string:
-  # connection_string: "mongodb://username:password@host:port/database?authSource=admin"
 ```
 
-### **Method 3: Automated Setup**
+## Connection String Format
 
-Run the database setup script:
-
-```bash
-python3 setup_database.py
+**MongoDB Atlas Connection String:**
+```
+mongodb+srv://username:password@cluster.mongodb.net/database_name?retryWrites=true&w=majority
 ```
 
-This will:
-- Check if MongoDB is installed
-- Install MongoDB if needed
-- Start MongoDB service
-- Create database user
-- Generate environment file
-- Test connection
-
-### **Connection String Examples**
-
-**Local MongoDB (no auth):**
+**Example:**
 ```
-mongodb://localhost:27017/ai_pentesting_agent
+mongodb+srv://eliot_user:MySecurePassword123@eliot-cluster.abc123.mongodb.net/ai_pentesting_agent?retryWrites=true&w=majority
 ```
 
-**Local MongoDB with auth:**
-```
-mongodb://username:password@localhost:27017/ai_pentesting_agent?authSource=admin
-```
+## Testing Your Connection
 
-**Remote MongoDB:**
-```
-mongodb://username:password@remote-host:27017/ai_pentesting_agent?authSource=admin
-```
+### **Test Connection with Python**
 
-**MongoDB Atlas (cloud):**
-```
-mongodb+srv://username:password@cluster.mongodb.net/ai_pentesting_agent?retryWrites=true&w=majority
-```
+Create a test script to verify your connection:
 
-### **Quick Start Commands**
-
-**1. Install MongoDB (Linux):**
-```bash
-sudo apt update
-sudo apt install mongodb
-sudo systemctl start mongodb
-sudo systemctl enable mongodb
-```
-
-**2. Install MongoDB (macOS):**
-```bash
-brew tap mongodb/brew
-brew install mongodb-community
-brew services start mongodb/brew/mongodb-community
-```
-
-**3. Install MongoDB (Windows):**
-- Download from: https://www.mongodb.com/try/download/community
-- Run installer
-- Start MongoDB service
-
-**4. Set environment variables:**
-```bash
-export MONGODB_HOST=localhost
-export MONGODB_PORT=27017
-export MONGODB_DATABASE=ai_pentesting_agent
-```
-
-**5. Test connection:**
-```bash
-python3 quick_test.py
-```
-
-### **Database Collections**
-
-The agent automatically creates these collections:
-
-- **experiences** - All exploitation attempts and outcomes
-- **targets** - Discovered systems and their profiles
-- **exploits** - Available exploits and custom generated ones
-- **sessions** - Active compromised sessions
-- **patterns** - Learned attack patterns
-- **strategies** - Optimized attack strategies
-
-### **Troubleshooting**
-
-**Connection Refused:**
-```bash
-# Check if MongoDB is running
-sudo systemctl status mongodb  # Linux
-brew services list | grep mongodb  # macOS
-
-# Start MongoDB
-sudo systemctl start mongodb  # Linux
-brew services start mongodb/brew/mongodb-community  # macOS
-```
-
-**Authentication Failed:**
-```bash
-# Connect to MongoDB and create user
-mongosh
-use admin
-db.createUser({
-  user: "ai_pentest_agent",
-  pwd: "secure_password",
-  roles: [{role: "readWrite", db: "ai_pentesting_agent"}]
-})
-```
-
-**Permission Denied:**
-```bash
-# Check MongoDB logs
-sudo journalctl -u mongodb  # Linux
-tail -f /usr/local/var/log/mongodb/mongo.log  # macOS
-```
-
-### **Security Notes**
-
-⚠️ **WARNING**: The agent stores sensitive data including:
-- Successful exploits and payloads
-- Compromised system details
-- Network topology information
-- Attack strategies and patterns
-
-**Recommendations:**
-- Use authentication for production deployments
-- Encrypt database connections
-- Regular backups
-- Network isolation
-- Access controls
-
-### **Cloud Deployment**
-
-For cloud deployment, consider:
-- **MongoDB Atlas** - Fully managed MongoDB service
-- **AWS DocumentDB** - MongoDB-compatible service
-- **Azure Cosmos DB** - Multi-model database service
-
-Example Atlas connection:
-```bash
-export MONGODB_URL="mongodb+srv://user:pass@cluster.mongodb.net/ai_pentesting_agent?retryWrites=true&w=majority"
-```
-
-### **Testing Database Connection**
-
-```bash
-# Quick test
-python3 -c "
+```python
 import pymongo
-client = pymongo.MongoClient('mongodb://localhost:27017/')
-print('Connection successful!' if client.admin.command('ping') else 'Connection failed')
-"
+from pymongo import MongoClient
 
-# Full system test
-python3 quick_test.py
+# Replace with your connection string
+connection_string = "mongodb+srv://eliot_user:your_password@eliot-cluster.xxxxx.mongodb.net/ai_pentesting_agent?retryWrites=true&w=majority"
+
+try:
+    client = MongoClient(connection_string)
+    # Test connection
+    client.admin.command('ping')
+    print("✅ Successfully connected to MongoDB Atlas!")
+    
+    # Test database access
+    db = client['ai_pentesting_agent']
+    collection = db['test_collection']
+    collection.insert_one({"test": "connection", "timestamp": "2024-01-01"})
+    print("✅ Successfully wrote to database!")
+    
+    # Clean up test document
+    collection.delete_one({"test": "connection"})
+    print("✅ Successfully deleted test document!")
+    
+except Exception as e:
+    print(f"❌ Connection failed: {e}")
 ```
 
-The agent will automatically create all necessary database structures when it first connects.
+### **Test with ELIOT**
+
+Run ELIOT to test the database connection:
+
+```bash
+# Set your connection string
+export MONGODB_URL="mongodb+srv://eliot_user:your_password@eliot-cluster.xxxxx.mongodb.net/ai_pentesting_agent?retryWrites=true&w=majority"
+
+# Run ELIOT
+python3 main.py --check
+```
+
+## Troubleshooting
+
+### **Common Issues**
+
+1. **Authentication Failed**
+   - Verify username and password are correct
+   - Check that the user has read/write permissions
+
+2. **Network Access Denied**
+   - Add your IP address to the network access list
+   - Wait a few minutes for changes to take effect
+
+3. **Connection Timeout**
+   - Check your internet connection
+   - Verify the connection string is correct
+   - Try using `0.0.0.0/0` temporarily for testing
+
+4. **Database Not Found**
+   - The database will be created automatically when first used
+   - Make sure the database name in the connection string is correct
+
+### **Security Best Practices**
+
+1. **Use Strong Passwords**
+   - Generate random, complex passwords
+   - Store passwords securely (use environment variables)
+
+2. **Limit Network Access**
+   - Only add necessary IP addresses
+   - Avoid using `0.0.0.0/0` in production
+
+3. **Regular Security Updates**
+   - Keep your MongoDB Atlas cluster updated
+   - Monitor access logs regularly
+
+## Database Collections
+
+ELIOT will automatically create these collections:
+
+- `experiences` - Store exploitation attempts and results
+- `targets` - Store discovered targets and their information
+- `exploits` - Store custom generated exploits
+- `sessions` - Store session data and handoffs
+
+## Free Tier Limits
+
+MongoDB Atlas M0 Sandbox (Free Tier):
+- 512 MB storage
+- Shared RAM
+- No backup
+- Suitable for development and testing
+
+For production use, consider upgrading to a paid tier for better performance and reliability.
+
+## Support
+
+If you encounter issues:
+1. Check the MongoDB Atlas documentation
+2. Verify your connection string format
+3. Test with the provided Python script
+4. Check ELIOT logs for specific error messages

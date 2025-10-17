@@ -59,10 +59,8 @@ class LearningConfig:
 
 @dataclass
 class DatabaseConfig:
-    """Database configuration"""
+    """Database configuration for MongoDB Atlas"""
     type: str = "mongodb"
-    host: str = "localhost"
-    port: int = 27017
     database: str = "ai_pentesting_agent"
     username: str = ""
     password: str = ""
@@ -202,8 +200,8 @@ class ConfigManager:
         self.safety = SafetyConfig(**self.config_data.get("safety", {}))
     
     def get_connection_string(self) -> str:
-        """Get database connection string"""
-        # Check if full connection string is provided
+        """Get MongoDB Atlas connection string"""
+        # Check if full connection string is provided (MongoDB Atlas recommended)
         if hasattr(self.database, 'connection_string') and self.database.connection_string:
             return self.database.connection_string
             
@@ -212,20 +210,21 @@ class ConfigManager:
         if mongodb_url:
             return mongodb_url
             
-        # Build connection string from components
+        # Build MongoDB Atlas connection string from components
         if self.database.type == "mongodb":
             # Get individual components from environment or config
-            host = os.getenv('MONGODB_HOST', self.database.host)
-            port = os.getenv('MONGODB_PORT', str(self.database.port))
             database = os.getenv('MONGODB_DATABASE', self.database.database)
             username = os.getenv('MONGODB_USERNAME', getattr(self.database, 'username', ''))
             password = os.getenv('MONGODB_PASSWORD', getattr(self.database, 'password', ''))
             auth_source = os.getenv('MONGODB_AUTH_SOURCE', getattr(self.database, 'auth_source', 'admin'))
             
+            # For MongoDB Atlas, require username and password
             if username and password:
-                return f"mongodb://{username}:{password}@{host}:{port}/{database}?authSource={auth_source}"
+                # Use MongoDB Atlas format
+                cluster = os.getenv('MONGODB_CLUSTER', 'your-cluster')
+                return f"mongodb+srv://{username}:{password}@{cluster}.mongodb.net/{database}?retryWrites=true&w=majority&authSource={auth_source}"
             else:
-                return f"mongodb://{host}:{port}/{database}"
+                raise ValueError("MongoDB Atlas requires username and password. Please configure them in config.yaml or environment variables.")
         elif self.database.type == "sqlite":
             return f"sqlite:///{self.database.database}.db"
         elif self.database.type == "postgresql":
