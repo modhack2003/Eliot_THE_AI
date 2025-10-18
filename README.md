@@ -36,10 +36,22 @@
 
 ## 🚀 **Quick Start**
 
+### **Quick Start (Clone & Run)**
+```bash
+# Clone and run immediately
+git clone https://github.com/modhack2003/Eliot_THE_AI.git
+cd Eliot_THE_AI
+python3 main.py 2>/dev/null
+```
+
 ### **Running ELIOT**
 ```bash
 # Clean interface (recommended - no warnings/errors in chat)
 python3 main.py 2>/dev/null
+
+# Or use the binary
+chmod +x eliot
+./eliot
 
 # Direct execution (with warnings visible)
 python3 main.py
@@ -48,7 +60,7 @@ python3 main.py
 ### **Installation (Kali Linux)**
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/Eliot_THE_AI.git
+git clone https://github.com/modhack2003/Eliot_THE_AI.git
 cd Eliot_THE_AI
 
 # Deploy ELIOT
