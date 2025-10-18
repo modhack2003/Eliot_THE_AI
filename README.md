@@ -174,28 +174,28 @@ database:
 │                                                             │
 │  ┌─────────────────────────────────────────────────────────┐ │
 │  │              INTERACTIVE MODE                          │ │
-│  │  • Chat Interface                                      │ │
-│  │  • User Commands                                       │ │
-│  │  • Real-time Execution                                 │ │
-│  │  • Ethical Oversight                                  │ │
+│  │  • Chat Interface (interactive_agent.py)              │ │
+│  │  • User Commands & Real-time Execution                │ │
+│  │  • Ethical Oversight & Target Validation              │ │
+│  │  • MCP Client Integration                              │ │
 │  └─────────────────────────────────────────────────────────┘ │
 │                                │                             │
 │                                ▼                             │
 │  ┌─────────────────────────────────────────────────────────┐ │
 │  │              AUTONOMOUS MODE                           │ │
-│  │  • AI Decision Making                                  │ │
-│  │  • Target Discovery                                    │ │
-│  │  • Automated Exploitation                              │ │
-│  │  • Learning & Adaptation                               │ │
+│  │  • AI Decision Making (autonomous_workflow.py)        │ │
+│  │  • Target Discovery & Profiling                       │ │
+│  │  • Automated Exploitation & Learning                  │ │
+│  │  • Multi-Provider LLM Management                      │ │
 │  └─────────────────────────────────────────────────────────┘ │
 │                                │                             │
 │                                ▼                             │
 │  ┌─────────────────────────────────────────────────────────┐ │
-│  │              TOOL INTEGRATION                          │ │
-│  │  • nmap, metasploit, sqlmap                           │ │
-│  │  • hydra, john, hashcat                               │ │
-│  │  • dirb, gobuster, nikto                              │ │
-│  │  • Custom Exploits                                     │ │
+│  │              CORE SYSTEM                               │ │
+│  │  • LLM Manager (OpenAI, Anthropic, Gemini, Ollama)    │ │
+│  │  • Intelligence Gathering & Exploit Development       │ │
+│  │  • Persistence Layer (MongoDB)                        │ │
+│  │  • Target Profiling & Vulnerability Scanning          │ │
 │  └─────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -221,13 +221,16 @@ database:
 - ✅ Learning from successful/failed attempts
 
 ### **Technical Features**
-- ✅ Gemini 2.5 Pro AI integration
-- ✅ Dual API key rotation for reliability
+- ✅ Multi-Provider LLM Support (OpenAI, Anthropic, Gemini, Ollama)
+- ✅ Advanced API key rotation and failover
 - ✅ MongoDB persistence for experience storage
+- ✅ MCP (Model Context Protocol) integration
 - ✅ Cross-platform support (Linux/Kali optimized)
 - ✅ Systemd service integration
 - ✅ ELF binary distribution (single executable)
 - ✅ Professional logging and monitoring
+- ✅ Self-learning and adaptation capabilities
+- ✅ Intelligence gathering and exploit development
 
 ---
 
@@ -248,19 +251,28 @@ database:
 ```
 Eliot_THE_AI/
 ├── agent/                          # Core agent modules
+│   ├── autonomous_workflow.py     # Autonomous workflow engine
+│   ├── core.py                    # Core agent functionality
 │   ├── interactive_agent.py       # Interactive chat interface
-│   ├── autonomous_workflow.py     # Optimized autonomous workflow
-│   ├── llm_manager.py            # LLM provider management
+│   ├── llm_manager.py            # Multi-provider LLM management
 │   ├── config_manager.py         # Configuration management
-│   ├── tools/                    # Pentesting tool integrations
-│   └── persistence/              # Database and logging
-├── main.py                       # Autonomous mode entry point
+│   ├── exploit_dev/              # Exploit development tools
+│   ├── intelligence/             # Intelligence gathering modules
+│   ├── learning/                 # Self-learning capabilities
+│   ├── persistence/              # Database and logging
+│   ├── targets/                  # Target profiling and scanning
+│   └── tools/                    # Pentesting tool integrations
+├── main.py                       # Main application entry point
 ├── interactive_main.py           # Interactive mode entry point
+├── run_agent.py                  # Agent runner
+├── start_agent.py                # Agent starter
+├── mcp_client.py                 # MCP server client
 ├── config.yaml                   # Configuration template
 ├── requirements.txt              # Python dependencies
 ├── build_eliot_linux.sh          # ELF binary builder
 ├── deploy_eliot_kali.sh          # Kali Linux deployment
 ├── ELIOT_DEPLOYMENT_GUIDE.md     # Complete deployment guide
+├── DATABASE_SETUP.md             # MongoDB setup guide
 └── README.md                     # This file
 ```
 
