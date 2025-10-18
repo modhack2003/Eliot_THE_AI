@@ -3,7 +3,7 @@
 **Simplified AI-Driven Pentesting with Kali MCP Server**
 *Powered by Kali Linux MCP Server for maximum tool compatibility*
 
-## 🚀 **by Bikram@2003**
+## 🚀 **by Bikram dey**
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
 [![Kali Linux](https://img.shields.io/badge/Kali-2025.3-red.svg)](https://kali.org)
@@ -499,5 +499,6 @@ eliot-interactive
 ---
 
 **ELIOT - THE AI HACKER ASSISTANT by Bikram@2003** 🚀
+
 
 *"Intelligence meets penetration testing"*
