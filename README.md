@@ -200,6 +200,147 @@ database:
 └─────────────────────────────────────────────────────────────┘
 ```
 
+## 🔄 **Complete Workflow Diagram**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              ELIOT WORKFLOW                                    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            SYSTEM INITIALIZATION                               │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ 1. Load Configuration (config.yaml)                                            │
+│ 2. Initialize LLM Manager (Multi-provider support)                             │
+│ 3. Connect to MongoDB (Token tracking & persistence)                          │
+│ 4. Initialize MCP Client (Kali tools integration)                             │
+│ 5. Test API Keys (Real-time validation)                                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              MODE SELECTION                                    │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  ┌─────────────────────────┐                    ┌─────────────────────────┐    │
+│  │    INTERACTIVE MODE     │                    │   AUTONOMOUS MODE       │    │
+│  │                         │                    │                         │    │
+│  │ • Chat-based interface  │                    │ • Unattended operation  │    │
+│  │ • User-controlled       │                    │ • AI decision making    │    │
+│  │ • Real-time execution   │                    │ • Continuous scanning   │    │
+│  │ • Ethical oversight     │                    │ • Automated exploitation │    │
+│  └─────────────────────────┘                    └─────────────────────────┘    │
+│           │                                              │                      │
+│           ▼                                              ▼                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          INTERACTIVE WORKFLOW                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  User Input → Command Router → [Shell Commands | AI Processing]                │
+│       │              │                    │                    │               │
+│       ▼              ▼                    ▼                    ▼               │
+│  ┌─────────┐  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐           │
+│  │ Natural │  │   Direct    │    │   Shell     │    │     AI      │           │
+│  │Language │  │  Commands   │    │  Commands   │    │ Processing  │           │
+│  │ Request │  │ (help,quit) │    │ (ls,ping)   │    │ (scan,test) │           │
+│  └─────────┘  └─────────────┘    └─────────────┘    └─────────────┘           │
+│       │              │                    │                    │               │
+│       ▼              ▼                    ▼                    ▼               │
+│  ┌─────────┐  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐           │
+│  │Response │  │   Status    │    │ subprocess  │    │ LLM Manager │           │
+│  │ Display │  │  Messages   │    │   Direct    │    │   + MCP     │           │
+│  └─────────┘  └─────────────┘    └─────────────┘    └─────────────┘           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          AUTONOMOUS WORKFLOW                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐            │
+│  │   DISCOVERY     │───▶│   PROFILING     │───▶│   RESEARCH      │            │
+│  │                 │    │                 │    │                 │            │
+│  │ • Network scan  │    │ • Service det.  │    │ • Vuln search   │            │
+│  │ • Host discov.  │    │ • OS detection  │    │ • Exploit find  │            │
+│  │ • Target enum.  │    │ • Port mapping  │    │ • CVE analysis  │            │
+│  └─────────────────┘    └─────────────────┘    └─────────────────┘            │
+│           │                       │                       │                   │
+│           ▼                       ▼                       ▼                   │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐            │
+│  │  EXPLOITATION   │◀───│   DECISION      │───▶│    LEARNING     │            │
+│  │                 │    │    MAKING       │    │                 │            │
+│  │ • Metasploit    │    │                 │    │ • Pattern anal. │            │
+│  │ • Custom exp.   │    │ • LLM reasoning │    │ • Success rate  │            │
+│  │ • Brute force   │    │ • Context eval  │    │ • Knowledge upd │            │
+│  └─────────────────┘    └─────────────────┘    └─────────────────┘            │
+│           │                       │                       │                   │
+│           ▼                       ▼                       ▼                   │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐            │
+│  │ POST-EXPLOIT    │    │   ESCALATION    │    │   PERSISTENCE   │            │
+│  │                 │    │                 │    │                 │            │
+│  │ • Session mgmt  │    │ • Priv. esc.    │    │ • Backdoor      │            │
+│  │ • Data extract  │    │ • Root access   │    │ • Cron jobs     │            │
+│  │ • Lateral mov.  │    │ • Admin rights  │    │ • Service reg   │            │
+│  └─────────────────┘    └─────────────────┘    └─────────────────┘            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            CORE COMPONENTS                                     │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐            │
+│  │  LLM MANAGER    │    │   MCP CLIENT    │    │   DATABASE      │            │
+│  │                 │    │                 │    │                 │            │
+│  │ • OpenAI        │    │ • Kali tools    │    │ • MongoDB       │            │
+│  │ • Anthropic     │    │ • nmap, msf     │    │ • Experiences  │            │
+│  │ • Gemini        │    │ • hydra, sqlmap │    │ • Targets      │            │
+│  │ • Ollama        │    │ • nikto, gob.   │    │ • Sessions     │            │
+│  │ • API rotation  │    │ • Tool exec.    │    │ • Patterns     │            │
+│  └─────────────────┘    └─────────────────┘    └─────────────────┘            │
+│           │                       │                       │                   │
+│           ▼                       ▼                       ▼                   │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐            │
+│  │ INTELLIGENCE    │    │   EXPLOIT DEV   │    │   TARGETS       │            │
+│  │                 │    │                 │    │                 │            │
+│  │ • Web research  │    │ • Code gen.     │    │ • Scanner       │            │
+│  │ • Exploit search│    │ • Payload dev   │    │ • Profiler      │            │
+│  │ • CVE analysis  │    │ • Custom exp.   │    │ • Vuln detect   │            │
+│  │ • Threat intel  │    │ • Shellcode     │    │ • Service enum  │            │
+│  └─────────────────┘    └─────────────────┘    └─────────────────┘            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            DATA FLOW                                            │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  Input → Processing → Execution → Results → Learning → Adaptation              │
+│    │         │           │          │         │           │                    │
+│    ▼         ▼           ▼          ▼         ▼           ▼                    │
+│  User    Command     Tool/MCP    Output    Pattern    Improved                 │
+│  Request  Router     Execution   Storage   Analysis   Decisions               │
+│                                                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │                    CONTINUOUS LEARNING LOOP                            │   │
+│  │                                                                         │   │
+│  │  Experience → Analysis → Pattern Recognition → Knowledge Update        │   │
+│  │      │           │              │                    │                 │   │
+│  │      ▼           ▼              ▼                    ▼                 │   │
+│  │  Success/    Statistical    ML Analysis        Database Update         │   │
+│  │  Failure     Analysis       & Clustering       & Model Training        │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 📊 **Features**

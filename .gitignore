@@ -160,3 +160,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Future development files (keep local, don't push to GitHub)
+SELF_LEARNING_FEATURE_PLAN.md
