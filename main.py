@@ -11,20 +11,24 @@ import contextlib
 import io
 import yaml
 import pymongo
+import signal
+import threading
 from pymongo import MongoClient
 from datetime import datetime
 
-# Suppress Gemini warnings from the very beginning
+# Suppress ALL warnings and errors from the very beginning
 os.environ['GRPC_VERBOSITY'] = 'ERROR'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['ABSL_LOG_LEVEL'] = '3'
 os.environ['GLOG_minloglevel'] = '3'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
 
 # Suppress Python warnings
 import warnings
 warnings.filterwarnings("ignore")
 
-# Redirect stderr to suppress warnings (will be restored later)
+# Redirect stderr to suppress warnings completely
 original_stderr = sys.stderr
 devnull = io.open(os.devnull, 'w')
 sys.stderr = devnull
@@ -125,9 +129,18 @@ class ELIOTAssistant:
             'credentials_found': []
         }
         
+        # Continuous pentesting mode
+        self.continuous_mode = False
+        self.current_objective = None
+        self.pentesting_active = False
+        self.emergency_stop = False
+        
         # Check MCP server health
         if not self.mcp_client.check_health():
             print("⚠️  WARNING: MCP server not available. Please start it with: kali-server-mcp --port 5000")
+        
+        # Setup emergency stop signal handler
+        self._setup_emergency_stop()
     
     def _init_mongodb(self):
         """Initialize MongoDB connection for token tracking"""
@@ -176,9 +189,12 @@ class ELIOTAssistant:
                         working_keys += 1
                         if key_status:
                             key_status.usage_count += 1
+                            # Reset any previous rate limiting for working keys
+                            key_status.rate_limited_until = 0
+                            key_status.error_count = 0
                     else:
-                        # Mark as rate limited if quota exceeded
-                        if 'quota' in test_result['details'].lower():
+                        # Only mark as rate limited if it's actually a quota error
+                        if 'quota' in test_result['details'].lower() or '429' in test_result['details']:
                             if key_status:
                                 key_status.rate_limited_until = current_time + 86400  # 24 hours
                         status_info += f"  Key {i}: {test_result['status']} {test_result['details']}\n"
@@ -193,14 +209,23 @@ class ELIOTAssistant:
         return status_info
     
     async def _test_api_key_real(self, api_key: str) -> dict:
-        """Test API key with a real request"""
+        """Test API key with a real request (with timeout)"""
         try:
+            import asyncio
             import google.generativeai as genai
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.5-pro')
             
-            # Make a simple test request
-            response = model.generate_content("Test")
+            # Run the synchronous API call in a thread with timeout
+            def test_request():
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel('gemini-2.5-pro')
+                response = model.generate_content("Test")
+                return response
+            
+            # Wait max 5 seconds for response (shorter timeout for startup test)
+            response = await asyncio.wait_for(
+                asyncio.to_thread(test_request), 
+                timeout=5.0
+            )
             
             if response.text:
                 # Track token usage in MongoDB
@@ -209,6 +234,8 @@ class ELIOTAssistant:
             else:
                 return {"working": False, "status": "❌", "details": "No response"}
             
+        except asyncio.TimeoutError:
+            return {"working": False, "status": "❌", "details": "Timeout (10s)"}
         except Exception as e:
             error_msg = str(e).lower()
             if "quota" in error_msg or "429" in error_msg:
@@ -357,8 +384,14 @@ class ELIOTAssistant:
         # Show loading indicator for AI processing
         print("🤔 Processing", end="", flush=True)
         
+        # Check for continuous pentesting requests
+        if self._is_continuous_pentesting_request(user_input):
+            print("\r" + " " * 20 + "\r", end="", flush=True)  # Clear loading indicator
+            await self.start_continuous_pentesting(user_input)
+            return "🎯 Continuous pentesting mode activated!"
+        
         # Handle direct commands (no loading needed)
-        if user_input.lower() in ['help', 'status', 'clear', 'quota', 'api status']:
+        if user_input.lower() in ['help', 'status', 'clear', 'quota', 'api status', 'stop', 'stop pentesting']:
             print("\r" + " " * 20 + "\r", end="", flush=True)  # Clear loading indicator
             
             if user_input.lower() == 'help':
@@ -376,6 +409,14 @@ class ELIOTAssistant:
                 return "🧹 Session cleared!"
             elif user_input.lower() in ['quota', 'api status']:
                 return self._check_api_status()
+            elif user_input.lower() in ['stop', 'stop pentesting']:
+                if self.pentesting_active:
+                    self.emergency_stop = True
+                    self.continuous_mode = False
+                    self.pentesting_active = False
+                    return "🛑 Pentesting stopped by user request"
+                else:
+                    return "ℹ️ No active pentesting to stop"
             elif user_input.lower() in ['tools', 'list tools', 'kali tools']:
                 return self._list_available_tools()
             elif user_input.lower() in ['add key', 'add api key', 'addkey']:
@@ -480,7 +521,8 @@ Response:"""
             # Use the LLM manager for AI conversation
             print("\r" + " " * 20 + "\r", end="", flush=True)  # Clear loading indicator
             
-            if not self.llm_manager.providers:
+            # Check if any API keys are actually working
+            if not self.llm_manager.providers or not self._has_working_api_keys():
                 return self._handle_offline_mode(user_input)
             
             try:
@@ -704,6 +746,193 @@ Response:"""
         """Check API key status and quota information"""
         return self._check_api_status_detailed()
     
+    def _has_working_api_keys(self) -> bool:
+        """Check if any API keys are actually working (not rate limited)"""
+        if not self.llm_manager.providers:
+            return False
+            
+        current_time = time.time()
+        
+        for provider_name, provider in self.llm_manager.providers.items():
+            if provider_name == 'gemini':
+                api_keys = provider.get('api_keys', [])
+                for key in api_keys:
+                    key_status = self.llm_manager.api_key_status.get(key)
+                    # Consider working if:
+                    # 1. No status recorded (never tested)
+                    # 2. Not currently rate limited
+                    # 3. Rate limit has expired
+                    if (not key_status or 
+                        key_status.rate_limited_until <= current_time or 
+                        key_status.usage_count > 0):  # If it was used successfully before
+                        return True
+            else:
+                # For other providers, assume working if configured
+                return True
+                
+        return False
+
+    def _is_continuous_pentesting_request(self, user_input: str) -> bool:
+        """Check if user input is a continuous pentesting request"""
+        user_input_lower = user_input.lower()
+        
+        # Keywords that indicate continuous pentesting
+        continuous_keywords = [
+            'do admin bypass',
+            'hack',
+            'penetrate',
+            'exploit',
+            'get access',
+            'find vulnerability',
+            'break into',
+            'compromise',
+            'gain access',
+            'bypass security',
+            'find admin',
+            'get admin access'
+        ]
+        
+        # Check if input contains continuous pentesting keywords
+        return any(keyword in user_input_lower for keyword in continuous_keywords)
+
+    def _setup_emergency_stop(self):
+        """Setup emergency stop signal handler"""
+        def emergency_stop_handler(signum, frame):
+            print("\n🚨 EMERGENCY STOP ACTIVATED!")
+            print("🛑 Stopping all pentesting operations...")
+            self.emergency_stop = True
+            self.pentesting_active = False
+            self.continuous_mode = False
+        
+        # Register Ctrl+E (SIGINT) as emergency stop
+        signal.signal(signal.SIGINT, emergency_stop_handler)
+    
+    async def start_continuous_pentesting(self, objective: str):
+        """Start continuous pentesting mode"""
+        self.continuous_mode = True
+        self.current_objective = objective
+        self.pentesting_active = True
+        self.emergency_stop = False
+        
+        print(f"\n🎯 Starting Continuous Pentesting Mode")
+        print(f"📋 Objective: {objective}")
+        print(f"🛑 Press Ctrl+C to Emergency Stop")
+        print("=" * 60)
+        
+        # Start pentesting loop
+        await self._pentesting_loop()
+    
+    async def _pentesting_loop(self):
+        """Main pentesting loop"""
+        step = 1
+        
+        while self.continuous_mode and not self.emergency_stop:
+            try:
+                print(f"\n🔄 Step {step}: Analyzing and planning next action...")
+                
+                # Check if objective is achieved
+                if await self._is_objective_achieved():
+                    print("\n✅ OBJECTIVE ACHIEVED!")
+                    print(f"🎯 Successfully completed: {self.current_objective}")
+                    break
+                
+                # Get next action from AI
+                next_action = await self._get_next_pentesting_action()
+                
+                if self.emergency_stop:
+                    break
+                
+                if next_action:
+                    print(f"\n⚡ Executing: {next_action}")
+                    await self._execute_pentesting_action(next_action)
+                
+                step += 1
+                
+                # Small delay to prevent overwhelming
+                await asyncio.sleep(1)
+                
+            except Exception as e:
+                print(f"⚠️ Error in pentesting loop: {e}")
+                await asyncio.sleep(2)
+        
+        if self.emergency_stop:
+            print("\n🛑 Pentesting stopped by user")
+        else:
+            print("\n✅ Pentesting completed")
+        
+        self.continuous_mode = False
+        self.pentesting_active = False
+    
+    async def _is_objective_achieved(self) -> bool:
+        """Check if the current objective has been achieved"""
+        if not self.current_objective:
+            return False
+        
+        objective_lower = self.current_objective.lower()
+        
+        # Check for common objectives
+        if "admin" in objective_lower and "bypass" in objective_lower:
+            # Check if we found admin access or credentials
+            return (len(self.session_context['credentials_found']) > 0 or 
+                   any('admin' in vuln.lower() for vuln in self.session_context['vulnerabilities']))
+        
+        elif "vulnerability" in objective_lower or "exploit" in objective_lower:
+            # Check if we found vulnerabilities
+            return len(self.session_context['vulnerabilities']) > 0
+        
+        elif "access" in objective_lower:
+            # Check if we gained some form of access
+            return (len(self.session_context['credentials_found']) > 0 or 
+                   len(self.session_context['vulnerabilities']) > 0)
+        
+        return False
+    
+    async def _get_next_pentesting_action(self) -> str:
+        """Get next pentesting action from AI"""
+        try:
+            if not self._has_working_api_keys():
+                return None
+            
+            # Create context-aware prompt
+            context = f"""
+            Current Objective: {self.current_objective}
+            Targets Found: {len(self.session_context['targets'])}
+            Vulnerabilities Found: {len(self.session_context['vulnerabilities'])}
+            Credentials Found: {len(self.session_context['credentials_found'])}
+            Exploits Tried: {len(self.session_context['exploits_tried'])}
+            
+            Based on the current progress, what should be the next pentesting action?
+            Respond with only the command to execute, or 'COMPLETE' if objective is achieved.
+            """
+            
+            response = self.llm_manager.generate_text(context)
+            if response and response.content:
+                action = response.content.strip()
+                if action.upper() == 'COMPLETE':
+                    return None
+                return action
+            
+        except Exception as e:
+            print(f"⚠️ Error getting next action: {e}")
+        
+        return None
+    
+    async def _execute_pentesting_action(self, action: str):
+        """Execute a pentesting action"""
+        try:
+            # Execute the action using existing command execution logic
+            if action.startswith('TOOL_EXECUTE:'):
+                command = action.replace('TOOL_EXECUTE:', '').strip()
+                result = await self._execute_ai_command(command, action)
+                print(result)
+            else:
+                # Try to execute as direct command
+                result = await self._execute_ai_command(action, action)
+                print(result)
+                
+        except Exception as e:
+            print(f"⚠️ Error executing action: {e}")
+
     def _check_api_status_detailed(self) -> str:
         """Check API key status with detailed information"""
         if not self.llm_manager.providers:
@@ -952,6 +1181,12 @@ Response:"""
   help                    - Show this help
   clear                   - Clear session data
   quota                   - Check API key status
+  stop                    - Stop active pentesting
+  
+🔥 CONTINUOUS PENTESTING MODE:
+  Use phrases like "do admin bypass", "hack", "exploit" to activate
+  continuous mode. ELIOT will keep trying until objective is achieved.
+  🚨 EMERGENCY STOP: Press Ctrl+C to stop all operations
   add key                 - Add your own Gemini API key
   tools                   - List all available pentesting tools
 
@@ -1002,28 +1237,23 @@ Response:"""
         print("""
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
-║  ███████╗██╗     ██╗ ██████╗ ████████╗    ███████╗████████╗ █████╗ ████████╗ ║
-║  ██╔════╝██║     ██║██╔═══██╗╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗╚══██╔══╝ ║
-║  █████╗  ██║     ██║██║   ██║   ██║       ███████╗   ██║   ███████║   ██║    ║
-║  ██╔══╝  ██║     ██║██║   ██║   ██║       ╚════██║   ██║   ██╔══██║   ██║    ║
-║  ██║     ███████╗██║╚██████╔╝   ██║       ███████║   ██║   ██║  ██║   ██║    ║
-║  ╚═╝     ╚══════╝╚═╝ ╚═════╝    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝    ║
+║   ELIOT - ███████╗██╗     ██╗ ██████╗ ████████╗                              ║
+║   ELIOT - ██╔════╝██║     ██║██╔═══██╗╚══██╔══╝                              ║
+║   ELIOT - █████╗  ██║     ██║██║   ██║   ██║                                 ║
+║   ELIOT - ██╔══╝  ██║     ██║██║   ██║   ██║                                 ║
+║   ELIOT - ███████╗███████╗██║╚██████╔╝   ██║                                 ║
+║   ELIOT - ╚══════╝╚══════╝╚═╝ ╚═════╝    ╚═╝                                 ║
 ║                                                                              ║
-║  ███████╗██╗     ██╗ ██████╗ ████████╗    ████████╗██╗  ██╗███████╗    █████╗ ██╗          ║
-║  ██╔════╝██║     ██║██╔═══██╗╚══██╔══╝    ╚══██╔══╝██║  ██║██╔════╝   ██╔══██╗██║          ║
-║  █████╗  ██║     ██║██║   ██║   ██║          ██║   ███████║█████╗     ███████║██║          ║
-║  ██╔══╝  ██║     ██║██║   ██║   ██║          ██║   ██╔══██║██╔══╝     ██╔══██║██║          ║
-║  ██║     ███████╗██║╚██████╔╝   ██║          ██║   ██║  ██║███████╗   ██║  ██║███████╗     ║
-║  ╚═╝     ╚══════╝╚═╝ ╚═════╝    ╚═╝          ╚═╝   ╚═╝  ╚═╝╚══════╝   ╚═╝  ╚═╝╚══════╝     ║
 ║                                                                              ║
-║  🎯 AI-Powered Pentesting Assistant with MCP Integration                     ║
-║  🚀 Direct Shell Access + Intelligent Tool Selection                         ║
+║  🎯 AN AGENT THAT CAN DO PENTESTING FOR YOU WITH KALI LINUX MCP SERVER       ║
+║  🚀 Direct Access To Kali Linux Pentesting Tools                             ║
 ║  👨‍💻 Made by BIKRAM DEY                                                       ║
 ║                                                                              ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
-║  💻 Shell Commands: ls, ifconfig, ping, ps, etc. (Direct execution)         ║
-║  🎯 Pentesting: scan <target>, test web <url> (AI-driven)                   ║
+║  💻 Shell Commands: ls, ifconfig, ping, ps, etc. (Direct execution)          ║
+║  🎯 Pentesting: scan <target>, test web <url> (AI-driven)                    ║
 ║  📋 Utilities: help, status, clear, quit                                     ║
+║  🚨 Emergency Stop: Press Ctrl+C during pentesting                          ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  Type your command below or 'help' for more options                          ║
 ╚══════════════════════════════════════════════════════════════════════════════╝""")
@@ -1031,13 +1261,12 @@ Response:"""
         # Initialize status tracking
         self.status_messages = []
         
-        # Check API status at startup with real test
-        print("\n🔍 Testing AI availability with real API requests...")
-        api_status = await self._test_api_keys_startup()
-        print(api_status)
-        
-        # If no API keys are working, offer user to add their own
-        if "❌ No working API keys available" in api_status:
+        # Check API status at startup (simplified)
+        print("\n🔍 Checking AI availability...")
+        if self._has_working_api_keys():
+            print("✅ AI Status: API keys configured and ready")
+        else:
+            print("❌ AI Status: No working API keys available")
             await self._offer_api_key_input()
         
         # Gemini warnings already suppressed via environment variables
