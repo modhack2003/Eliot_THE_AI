@@ -1,5 +1,21 @@
 # Changes
 
+## 2.0.0a2 — 24 October 2026
+
+- Added durable cybersecurity tasks with independent coordinator/worker state,
+  action journals, factual working memory, feedback, pause/cancel/resume and restart recovery.
+- Added typed evidence inspection, atomic task artifacts, scoped HTTP observations
+  and a constrained nmap service-observation adapter for Kali/Linux workers.
+- Added completion evidence references and a separate reviewer pass, cached-action
+  detection and explicit blocked/budget states; no default step/token budget.
+- Added text persona import and task snapshots below fixed system instructions.
+- Bundled 83 pinned Claude-BugHunter Markdown skill modules with their references,
+  source hashes, CC BY 4.0/MIT notices and credits; executable upstream code is excluded.
+- Added task/persona/skill CLI commands and local API routes.
+- Added regression tests for the task graph, recovery, replay, scoped tools,
+  prompt boundaries, artifact access and review rejection.
+- Deferred voice and visual redesign; broad legacy security-tool migration is still pending.
+
 ## 2.0.0a1 — 24 October 2026
 
 - Added a shared local backend and terminal/browser clients.

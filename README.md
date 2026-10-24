@@ -7,10 +7,19 @@ Connect an OpenAI-compatible Chat Completions endpoint, select its exact model I
 and use your own API key. Local model servers can run without authentication.
 Conversations and run history are stored in SQLite on your machine.
 
-Version **2.0.0a1** is the first working remaster milestone. It provides chat,
-provider configuration, persistence and cancellation. The original security-tool
-integrations remain in the source tree for migration; this release's chat does
-not execute shell commands or run autonomous penetration tests.
+Version **2.0.0a2** adds a durable cybersecurity agent core: coordinator/worker
+tasks, typed evidence tools, scoped observations, checkpoints, completion review,
+uploaded personas and 83 default skill modules. Ordinary conversation remains
+separate from task execution. The original broad security-tool integrations
+remain in the source tree for migration.
+
+See [the agent core guide](docs/AGENT_CORE.md) for long-running tasks and
+[third-party notices](THIRD_PARTY_NOTICES.md) for the bundled skill provenance.
+
+```sh
+eliot tasks create "Review the supplied cybersecurity evidence and delegate independent checks" --workspace /path/to/engagement --max-workers 3
+eliot tasks watch TASK_ID
+```
 
 ## Install and start
 
@@ -77,8 +86,9 @@ bounded and apply only to rate-limit and selected server-error responses; Eliot
 does not silently forward a failed request to another provider.
 
 Compatibility is with the **Chat Completions protocol**, not every feature of
-every model. Tools, images, custom authentication headers and the Responses API
-are not implemented in this alpha. Use a text chat model and the provider's exact
+every model. Native function calling, images, custom authentication headers and
+the Responses API are not implemented in this alpha. Agent tasks use validated
+JSON decisions with registered application tools instead. Use a text chat model and the provider's exact
 parameter names. Optional `/models` discovery is not required.
 
 ## Use the terminal and browser together
@@ -171,8 +181,8 @@ entrypoint. The wheel includes the web assets and the supported remaster package
 The remaster replaces the default launcher; the original main implementation
 is retained as `legacy_main.py`. Its heavyweight dependencies are separated in
 `requirements-legacy.txt`. `agent/`, `mcp_client.py` and historical installation
-scripts remain for reference and future migration. They are not part of the new
-shared chat backend, and the old installers are not the supported setup path.
+scripts remain for reference and future migration. They are not the implementation
+of the new durable task core, and the old installers are not the supported setup path.
 
 The working source no longer embeds the exposed MongoDB credential. The old
 credential must still be revoked by its owner: source edits do not invalidate it
@@ -185,6 +195,7 @@ The legacy workflow persistence stubs, automatic vulnerability labels, generated
 code contract, external-session handling and historical packaging still need
 migration and validation. This release does not claim those features are fixed.
 
-Next milestones: validated tool registry and evidence records, reliable transport
-adapters, scoped jobs, verified findings, bounded workflows, and Linux installation
-validation. Keep the original attribution and license when redistributing.
+Next milestones: broader Kali tool adapters, stronger workflow-specific finding
+validators, isolated worker environments, Linux integration validation and the
+new visual interface. Keep the original attribution and third-party notices
+when redistributing.

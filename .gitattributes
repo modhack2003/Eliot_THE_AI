@@ -1,0 +1,2 @@
+# Preserve vendored content bytes: the integrity manifest covers original upstream data.
+eliot_app/bundled_skills/** -text

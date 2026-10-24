@@ -101,7 +101,7 @@ def test_sessions_and_context_survive_backend_restart(tmp_path):
         assert client.get("/api/sessions").json()[0]["id"] == session["id"]
         run = client.post(f'/api/sessions/{session["id"]}/runs', json={"content":"What was it?"}).json()
         client.get(f'/api/runs/{run["id"]}/events')
-        assert [m["content"] for m in payloads[-1]["messages"]][1:] == ["Remember my first question", "Saved answer", "What was it?"]
+        assert [m["content"] for m in payloads[-1]["messages"]][2:] == ["Remember my first question", "Saved answer", "What was it?"]
 
 
 def test_api_cancellation_and_conflicting_sends(tmp_path):

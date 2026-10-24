@@ -20,6 +20,8 @@ from .config import ConfigError, Provider, Settings
 from .gateway import ProviderError
 from .service import Service
 from .store import BusyError
+from .mission_runtime import MissionRuntime
+from .instructions import CORE_SYSTEM
 
 
 class NewSession(BaseModel):
@@ -29,6 +31,34 @@ class NewSession(BaseModel):
 class Chat(BaseModel):
     content: str = Field(min_length=1, max_length=16_000)
     provider_id: str | None = None
+    persona_id: str = "eliot"
+
+
+class NewTask(BaseModel):
+    objective: str = Field(min_length=1, max_length=12_000)
+    workspace: str
+    provider_id: str | None = None
+    persona_id: str = "eliot"
+    skills: list[str] | None = Field(default=None, max_length=12)
+    targets: list[str] = Field(default_factory=list, max_length=100)
+    network: bool = False
+    max_steps: int = Field(default=0, ge=0)
+    token_budget: int = Field(default=0, ge=0)
+    max_workers: int = Field(default=3, ge=1, le=6)
+
+
+class PersonaInput(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    instructions: str = Field(min_length=1, max_length=12_000)
+
+
+class TaskFeedback(BaseModel):
+    text: str = Field(min_length=1, max_length=6000)
+
+
+class TaskResume(BaseModel):
+    max_steps: int | None = Field(default=None, ge=0)
+    token_budget: int | None = Field(default=None, ge=0)
 
 
 class Profile(BaseModel):
@@ -51,17 +81,21 @@ class TemporaryKey(BaseModel):
 def create_app(config_path=None, gateway=None):
     settings = Settings(config_path)
     service = Service(settings, gateway)
+    missions = MissionRuntime(service)
     csrf_token = secrets.token_urlsafe(32)
     key_tests = set()
 
     @asynccontextmanager
     async def lifespan(app):
         service.store.recover()
+        missions.recover()
         yield
+        await missions.close()
         await service.close()
 
     app = FastAPI(title="Eliot Remastered", version=__version__, lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.service = service
+    app.state.missions = missions
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "[::1]"])
 
     @app.middleware("http")
@@ -202,7 +236,51 @@ def create_app(config_path=None, gateway=None):
     async def chat(session_id: str, item: Chat):
         if not item.content.strip():
             raise ConfigError("Enter a message.")
-        return service.start(session_id, item.content.strip(), item.provider_id)
+        return service.start(session_id, item.content.strip(), item.provider_id, item.persona_id)
+
+    @app.get("/api/instructions")
+    async def instructions():
+        import hashlib
+        return {"system": CORE_SYSTEM, "sha256": hashlib.sha256(CORE_SYSTEM.encode()).hexdigest(), "hierarchy": ["system and runtime permissions", "persona", "skills", "task and external data"]}
+
+    @app.get("/api/skills")
+    async def skills():
+        return missions.catalog.list()
+
+    @app.get("/api/personas")
+    async def personas():
+        return missions.store.personas()
+
+    @app.put("/api/personas/{persona_id}")
+    async def upload_persona(persona_id: str, item: PersonaInput):
+        return missions.store.save_persona(persona_id, item.name, item.instructions)
+
+    @app.get("/api/tasks")
+    async def task_list():
+        return missions.store.list()
+
+    @app.post("/api/tasks")
+    async def create_task(item: NewTask):
+        return missions.create(**item.model_dump())
+
+    @app.get("/api/tasks/{task_id}")
+    async def task_detail(task_id: str):
+        mission = missions.store.get(task_id)
+        return {**mission, "children": [m for m in missions.store.list(mission["root_id"]) if m["parent_id"] == task_id], "totals": missions.store.totals(mission["root_id"])}
+
+    @app.get("/api/tasks/{task_id}/events")
+    async def task_events(task_id: str, after: int = 0):
+        missions.store.get(task_id)
+        return missions.store.events(task_id, after=max(0, after))
+
+    @app.post("/api/tasks/{task_id}/feedback")
+    async def task_feedback(task_id: str, item: TaskFeedback):
+        missions.store.get(task_id)
+        return {"event_id": missions.store.feedback(task_id, item.text)}
+
+    @app.post("/api/tasks/{task_id}/{action}")
+    async def task_control(task_id: str, action: str, item: TaskResume | None = None):
+        return await missions.control(task_id, action, **(item.model_dump() if item else {}))
 
     @app.get("/api/runs/{run_id}")
     async def run(run_id: str):

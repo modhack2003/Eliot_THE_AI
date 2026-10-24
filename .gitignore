@@ -164,3 +164,4 @@ SELF_LEARNING_FEATURE_PLAN.md
 data/
 .pytest_cache/
 remaster-config.yaml
+.eliot-artifacts/
