@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Eliot — your local workspace for AI conversations, any compatible provider, and lasting context.">
+  <title>Eliot · Workspace</title>
+  <link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="Eliot home"><span class="brand-mark">e.</span><span>eliot<span class="brand-caption">REMASTERED</span></span></a>
+    <button id="new-chat" class="new-chat"><span>＋</span> New conversation <kbd>N</kbd></button>
+    <div class="nav-label">WORKSPACE</div>
+    <button id="chat-nav" class="nav active"><span>◫</span> Conversations <span id="session-count" class="count">0</span></button>
+    <button id="providers-nav" class="nav"><span>⌘</span> Providers <span id="provider-count" class="count">0</span></button>
+    <div class="history-heading"><span class="nav-label">RECENT CONVERSATIONS</span><button id="refresh" class="icon-button" aria-label="Refresh conversations">↻</button></div>
+    <div id="sessions" class="session-list"></div>
+    <div class="sidebar-footer"><span class="status-dot"></span><div>Local workspace<small id="version">Eliot 2.0</small></div><span class="footer-symbol">↗</span></div>
+  </aside>
+  <main>
+    <header class="topbar"><div class="breadcrumb"><button id="menu-toggle" class="icon-button mobile-menu" aria-label="Toggle workspace menu" aria-expanded="false">☰</button>Workspace <span>/</span> <strong id="page-label">Conversations</strong></div><div class="topbar-right"><span class="local-label"><i class="status-dot"></i> On your machine</span><button id="settings-link" class="icon-button" aria-label="Open provider settings">⚙</button></div></header>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <section id="chat-view" class="chat-view">
+      <div class="conversation-toolbar"><div class="model-control"><span class="mini-mark">✳</span><label class="sr-only" for="provider-select">Active provider</label><select id="provider-select"><option value="">Connect a provider</option></select><span id="model-name" class="model-name"></span></div><div class="conversation-actions"><a id="export-session" class="text-button" hidden>↓ Export</a><button id="delete-session" class="text-button" hidden>Delete</button></div></div>
+      <div id="conversation" class="conversation" aria-live="polite">
+        <div id="welcome" class="welcome">
+          <div class="eyebrow"><span></span> A NEW CHAPTER FOR ELIOT</div>
+          <h1>Less friction.<br><em>More possibility.</em></h1>
+          <p>Your models. Your conversations. One workspace.<br>Choose a provider and pick up where your ideas left off.</p>
+          <button id="connect-provider" class="connect-button">Connect your first provider <span>↗</span></button>
+          <div class="suggestions"><button data-prompt="Help me review a software project. What code and context should I share first?"><span>01 / REVIEW</span><strong>Understand a codebase</strong><small>Trace the structure. Find what matters. ↗</small></button><button data-prompt="Help me debug a problem. Ask me for the symptoms and relevant logs before suggesting a fix."><span>02 / RESOLVE</span><strong>Work through a problem</strong><small>Turn a rough edge into a next step. ↗</small></button><button data-prompt="Help me make a practical implementation plan with clear milestones and verification steps."><span>03 / BUILD</span><strong>Shape the next version</strong><small>From an idea to a practical plan. ↗</small></button></div>
+        </div>
+        <div id="messages" class="messages"></div>
+      </div>
+      <div class="composer-area"><form id="chat-form" class="composer"><label for="message" class="sr-only">Message Eliot</label><textarea id="message" rows="2" maxlength="16000" placeholder="What are we working on today?"></textarea><div class="composer-bottom"><span id="run-status"><span class="small-dot"></span> Ready when you are</span><div><button id="stop" class="stop-button" type="button" hidden>■ Stop</button><button id="send" class="send-button" type="submit" aria-label="Send message">↑</button></div></div></form><p class="composer-note">Conversations stay on this machine. Messages are sent to your selected model provider.</p></div>
+    </section>
+    <section id="providers-view" class="providers-view" hidden>
+      <div class="eyebrow"><span></span> CONNECT YOUR INTELLIGENCE</div><div class="page-heading"><div><h1>Your models.<br><em>Your choice.</em></h1><p>Bring an OpenAI-compatible API or a local model server.</p></div><button id="add-provider" class="primary-button">＋ Add provider</button></div>
+      <div id="provider-cards" class="provider-cards"></div>
+      <div class="quiet-note"><span>↳</span><p>Use an exact model ID and the API's base address, usually ending in <code>/v1</code>. Connection tests send a short request to your provider. Streaming can be turned off for providers that only support standard responses.</p></div>
+    </section>
+  </main>
+  <dialog id="provider-dialog"><form id="provider-form"><div class="dialog-heading"><div><div class="eyebrow">PROVIDER PROFILE</div><h2 id="dialog-title">Make a connection.</h2></div><button type="button" id="close-dialog" class="icon-button" aria-label="Close provider settings">×</button></div>
+    <div class="form-row"><label>Display name<input id="p-name" required maxlength="120" placeholder="My model provider"></label><label>Profile ID<input id="p-id" required pattern="[a-zA-Z0-9_-]{1,64}" maxlength="64" placeholder="primary"></label></div>
+    <label>API base URL<input id="p-url" type="url" required placeholder="https://api.example.com/v1"></label>
+    <label>Model ID<input id="p-model" required maxlength="200" placeholder="Exact model ID from your provider"></label>
+    <div class="form-row"><label>Authentication<select id="p-auth"><option value="bearer">API key</option><option value="none">No key (local server)</option></select></label><label>Key environment variable<input id="p-env" value="ELIOT_API_KEY" required pattern="[A-Za-z_][A-Za-z0-9_]*"></label></div>
+    <label>Temporary API key <span class="optional">optional</span><input id="p-key" type="password" autocomplete="new-password" maxlength="4096" placeholder="Set a key for this backend session"></label><p class="field-note">Temporary keys stay in backend memory until it exits. To keep a key across restarts, set the environment variable before starting Eliot.</p>
+    <label class="checkbox-label"><input id="p-stream" type="checkbox" checked> Stream responses as they arrive</label>
+    <details><summary>Advanced model settings</summary><div class="form-row"><label>Timeout (seconds)<input id="p-timeout" type="number" min="1" max="300" value="60" required></label><label>Server-error retries<input id="p-retries" type="number" min="0" max="2" value="1" required></label></div><label>Generation parameters (JSON)<textarea id="p-parameters" rows="3" spellcheck="false">{}</textarea></label><p class="field-note">Leave empty for compatibility. Add only parameters supported by your model, such as max_tokens or max_completion_tokens.</p></details>
+    <div id="form-error" class="form-error" role="alert" hidden></div><div class="dialog-footer"><button type="button" id="cancel-dialog" class="secondary-button">Cancel</button><button type="submit" id="save-provider" class="primary-button">Save provider ↗</button></div>
+  </form></dialog>
+</body>
+</html>

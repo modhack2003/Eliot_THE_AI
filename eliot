@@ -1,41 +1,4 @@
-#!/bin/bash
-# ELIOT Launcher - Works with both regular user and sudo
-
-echo "🚀 ELIOT - AI Pentesting Assistant"
-echo "=================================="
-
-# Check if running with sudo
-if [ "$EUID" -eq 0 ]; then
-    echo "Running with elevated privileges (sudo)"
-    echo "✅ System-wide packages available"
-else
-    echo "Running as regular user"
-fi
-
-echo ""
-echo "Starting ELIOT..."
-echo ""
-
-# Check if MCP server is running
-if ! curl -s http://localhost:5000/health > /dev/null 2>&1; then
-    echo "⚠️  MCP server not running. Starting it..."
-    echo "Starting Kali MCP server on port 5000..."
-    kali-server-mcp --port 5000 --debug > /dev/null 2>&1 &
-    sleep 3
-    
-    # Check if server started successfully
-    if curl -s http://localhost:5000/health > /dev/null 2>&1; then
-        echo "✅ MCP server started successfully"
-    else
-        echo "❌ Failed to start MCP server. Please start manually:"
-        echo "   kali-server-mcp --port 5000"
-        exit 1
-    fi
-else
-    echo "✅ MCP server is already running"
-fi
-
-echo ""
-
-# Run ELIOT with warnings suppressed
-python3 main.py 2>/dev/null
+#!/bin/sh
+# Run from this source checkout, including paths containing spaces.
+ELIOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec python3 "$ELIOT_DIR/main.py" "$@"

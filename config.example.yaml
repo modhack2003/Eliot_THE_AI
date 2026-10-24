@@ -1,0 +1,25 @@
+# Copy to config.yaml, or start without a file and add profiles in the web app.
+version: 1
+default_provider: primary
+database_path: data/eliot.db
+providers:
+  - id: primary
+    name: My API provider
+    base_url: https://api.openai.com/v1
+    model: replace-with-your-exact-model-id
+    api_key_env: ELIOT_API_KEY
+    auth: bearer
+    streaming: true
+    timeout_seconds: 60
+    max_retries: 1
+    # Optional controls: temperature, top_p, max_tokens OR max_completion_tokens,
+    # seed, presence_penalty, frequency_penalty, reasoning_effort.
+    # Leave empty for maximum compatibility; support depends on the selected model.
+    parameters: {}
+  - id: local
+    name: Local model server
+    base_url: http://127.0.0.1:1234/v1
+    model: replace-with-your-local-model-id
+    auth: none
+    streaming: true
+    parameters: {}

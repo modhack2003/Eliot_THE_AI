@@ -231,7 +231,7 @@ class ExperienceDatabase:
         try:
             doc = await self.db.targets.find_one({"ip": ip})
             if doc:
-                doc['_id'] = str(doc['_id'])
+                doc.pop('_id', None)
                 return Target(**doc)
             return None
         except Exception as e:
@@ -249,7 +249,7 @@ class ExperienceDatabase:
             targets = []
             
             async for doc in cursor:
-                doc['_id'] = str(doc['_id'])
+                doc.pop('_id', None)
                 targets.append(Target(**doc))
             
             return targets
@@ -299,7 +299,7 @@ class ExperienceDatabase:
         try:
             doc = await self.db.exploits.find_one({"name": name})
             if doc:
-                doc['_id'] = str(doc['_id'])
+                doc.pop('_id', None)
                 return Exploit(**doc)
             return None
         except Exception as e:
@@ -313,7 +313,7 @@ class ExperienceDatabase:
             exploits = []
             
             async for doc in cursor:
-                doc['_id'] = str(doc['_id'])
+                doc.pop('_id', None)
                 exploits.append(Exploit(**doc))
             
             return exploits
@@ -373,7 +373,7 @@ class ExperienceDatabase:
         try:
             doc = await self.db.sessions.find_one({"session_id": session_id})
             if doc:
-                doc['_id'] = str(doc['_id'])
+                doc.pop('_id', None)
                 return Session(**doc)
             return None
         except Exception as e:
@@ -387,7 +387,7 @@ class ExperienceDatabase:
             sessions = []
             
             async for doc in cursor:
-                doc['_id'] = str(doc['_id'])
+                doc.pop('_id', None)
                 sessions.append(Session(**doc))
             
             return sessions

@@ -100,10 +100,7 @@ keys/
 *.pem
 *.crt
 
-# Test files
-test_*.py
-*_test.py
-tests/
+# Tests are versioned.
 
 # Documentation builds
 docs/_build/
@@ -163,3 +160,7 @@ dmypy.json
 
 # Future development files (keep local, don't push to GitHub)
 SELF_LEARNING_FEATURE_PLAN.md
+# Local workspace state
+data/
+.pytest_cache/
+remaster-config.yaml
