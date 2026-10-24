@@ -1,1 +1,6 @@
 recursive-include eliot_app/bundled_skills *
+include install.sh install.ps1 install.cmd config.example.yaml
+include install_eliot.sh deploy_eliot_kali.sh production_deploy.sh start_eliot.sh eliot main.py
+include scripts/install.py
+include THIRD_PARTY_NOTICES.md CHANGELOG.md
+recursive-include docs *.md

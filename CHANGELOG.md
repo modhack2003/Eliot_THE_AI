@@ -1,5 +1,20 @@
 # Changes
 
+## 2.0.0a3 — 24 October 2026
+
+- Added one-command Kali/Debian/Ubuntu setup with automatic OS prerequisites,
+  isolated Python installation, default skills and an application launcher.
+- Added Windows double-click/PowerShell setup with Python provisioning through
+  winget when needed; security-tool provisioning remains Linux-first.
+- Separated installed configuration/data from runtime and source, preserved
+  existing state on reinstall, locked concurrent setup and verified a candidate
+  before atomically activating it. Old runtimes remain available for inspection.
+- Expanded offline doctor checks for dependencies, storage, web assets, skill
+  integrity and nmap, with machine-readable reports and strict exit status.
+- Moved the historical prototype, agent modules, deployment scripts and old docs
+  under legacy/; retained compatibility aliases for the old installer commands.
+- Added real Linux/Windows installation CI and outside-source API verification.
+
 ## 2.0.0a2 — 24 October 2026
 
 - Added durable cybersecurity tasks with independent coordinator/worker state,

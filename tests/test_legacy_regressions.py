@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def isolated(path, names):
-    tree = ast.parse((ROOT / path).read_text(encoding="utf-8"))
+    tree = ast.parse((ROOT / "legacy" / path).read_text(encoding="utf-8"))
     nodes = [node for node in tree.body if isinstance(node, ast.ClassDef) and node.name in names]
     module = types.ModuleType("legacy_regression_" + path.replace("/", "_").replace(".", "_"))
     sys.modules[module.__name__] = module
@@ -58,5 +58,5 @@ def test_legacy_key_cooldown_is_respected_after_prior_use():
 
 def test_source_no_longer_embeds_database_credentials():
     import re
-    for path in ROOT.glob("*.py"):
+    for path in [*ROOT.glob("*.py"), *(ROOT / "legacy").glob("*.py")]:
         assert not re.search(r"mongodb(?:\+srv)?://[^\s'\"]+:[^\s'\"]+@", path.read_text(encoding="utf-8"))

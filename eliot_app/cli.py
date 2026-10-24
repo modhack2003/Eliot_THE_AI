@@ -25,7 +25,10 @@ def main():
     commands = parser.add_subparsers(dest="command")
     serve = commands.add_parser("serve", help="Start the local backend and web interface")
     serve.add_argument("--port", type=int, default=8765)
-    commands.add_parser("doctor", help="Validate configuration without making provider requests")
+    doctor = commands.add_parser("doctor", help="Check dependencies, storage, web assets and skill integrity offline")
+    doctor.add_argument("--json", action="store_true", help="Machine-readable readiness report")
+    doctor.add_argument("--strict", action="store_true", help="Exit unsuccessfully if a required check fails")
+    doctor.add_argument("--require-nmap", action="store_true", help="Treat missing nmap as an error")
     chat = commands.add_parser("chat", help="Chat using the running backend")
     chat.add_argument("--session", help="Resume a saved session")
     chat.add_argument("--provider", help="Provider profile ID")
@@ -87,10 +90,17 @@ def main():
             uvicorn.run(create_app(args.config), host="127.0.0.1", port=args.port, access_log=False)
             return
         if args.command == "doctor":
-            settings = Settings(args.config)
-            print(f"Eliot {__version__}\nConfig: {settings.path}\nSession database: {settings.database_path}")
-            print(f"Providers: {len(settings.providers)}; default: {settings.default_provider or 'not set'}")
-            print("No API calls were made. Start with: eliot serve")
+            from .diagnostics import diagnose
+            report = diagnose(args.config, require_nmap=args.require_nmap)
+            if args.json:
+                print(json.dumps(report, indent=2, ensure_ascii=False))
+            else:
+                print(f"Eliot {__version__} — installation checks")
+                for check in report["checks"]:
+                    print(f'{check["status"].upper():7} {check["name"]}: {check["detail"]}')
+                print("No API calls or scans were made. Start with: eliot serve")
+            if args.strict and not report["ready"]:
+                raise SystemExit(1)
             return
         url = urlsplit(args.server)
         if url.scheme != "http" or not url.hostname or not loopback(url.hostname) or url.username or url.password or url.query or url.fragment:
