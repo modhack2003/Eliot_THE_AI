@@ -63,8 +63,7 @@ async def main():
     with SuppressStderr():
         print_banner()
         
-        # Set MongoDB Atlas URL
-        os.environ['MONGODB_URL'] = 'mongodb+srv://bikram20031213:2dYTwXlrYpgpyGxC@cluster0.8zrf3zz.mongodb.net/ai_pentesting_agent'
+        # Database credentials must be supplied through environment or configuration.
         
         try:
             # Create and start interactive agent

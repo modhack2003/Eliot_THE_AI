@@ -1,504 +1,190 @@
-# ELIOT - AI Pentesting Assistant (MCP Version)
+# Eliot Remastered
 
-**Simplified AI-Driven Pentesting with Kali MCP Server**
-*Powered by Kali Linux MCP Server for maximum tool compatibility*
+**Your models. Your conversations. One local workspace.**
 
-## 🚀 **by Bikram dey**
+Eliot now has a shared Python backend, a browser interface and a terminal client.
+Connect an OpenAI-compatible Chat Completions endpoint, select its exact model ID,
+and use your own API key. Local model servers can run without authentication.
+Conversations and run history are stored in SQLite on your machine.
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
-[![Kali Linux](https://img.shields.io/badge/Kali-2025.3-red.svg)](https://kali.org)
-[![MCP](https://img.shields.io/badge/MCP-Enabled-green.svg)](https://modelcontextprotocol.io)
-[![License](https://img.shields.io/badge/License-Educational-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Kali%20Linux-red.svg)](https://kali.org)
+Version **2.0.0a1** is the first working remaster milestone. It provides chat,
+provider configuration, persistence and cancellation. The original security-tool
+integrations remain in the source tree for migration; this release's chat does
+not execute shell commands or run autonomous penetration tests.
 
----
+## Install and start
 
-## 🎯 **Overview**
+Requires Python **3.11 or newer**. Run these commands in the extracted repository.
 
-**ELIOT** is a simplified AI-powered penetration testing assistant that uses the official Kali Linux MCP (Model Context Protocol) server. This approach provides:
+Linux / Kali:
 
-- **Simplified Architecture**: Uses official Kali MCP server instead of custom tool wrappers
-- **All Kali Tools Available**: Access to every tool in Kali Linux without manual configuration  
-- **AI-Driven Intelligence**: Natural language understanding with automatic tool selection
-- **Clean Codebase**: Reduced from 600+ lines to ~200 lines of clean, maintainable code
-- **Official Support**: Built on Kali's official MCP implementation
-
-### **Key Features**
-- 🤖 **AI-Powered Intelligence** - Gemini 2.5 Pro integration
-- 💬 **Interactive Mode** - Chat-based command interface
-- 🔄 **Autonomous Mode** - Unattended penetration testing
-- 🎯 **Smart Targeting** - Automatic network discovery
-- 🛠️ **Tool Integration** - nmap, metasploit, sqlmap, hydra, and more
-- 📊 **Minimal Token Usage** - Optimized for long-term operation
-- 🔧 **ELF Binary** - Single executable deployment
-
----
-
-## 🚀 **Quick Start**
-
-### **Quick Start (Clone & Run)**
-```bash
-# Clone and run immediately
-git clone https://github.com/modhack2003/Eliot_THE_AI.git
-cd Eliot_THE_AI
-python3 main.py 2>/dev/null
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
+python main.py serve
 ```
 
-### **Running ELIOT**
-```bash
-# Clean interface (recommended - no warnings/errors in chat)
-python3 main.py 2>/dev/null
+Windows PowerShell:
 
-# Or use the binary
-chmod +x eliot
-./eliot
-
-# Direct execution (with warnings visible)
-python3 main.py
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe main.py serve
 ```
 
-### **Installation (Kali Linux)**
-```bash
-# Clone the repository
-git clone https://github.com/modhack2003/Eliot_THE_AI.git
-cd Eliot_THE_AI
+Open **http://127.0.0.1:8765**. If that port is occupied, use `python main.py serve --port 8876`.
+After installation, the `eliot` command is equivalent to `python main.py`.
+The backend binds to loopback and accepts local clients only. Keep one backend
+process per configuration/database. This alpha does not support remote hosting
+or multiple server workers.
 
-# Deploy ELIOT
-chmod +x deploy_eliot_kali.sh
-sudo ./deploy_eliot_kali.sh
+## Connect a model
 
-# Configure
-sudo nano /etc/eliot/config.yaml
+Start without any configuration file and choose **Connect your first provider**.
+Enter a name, API base URL (including the provider's version prefix if required),
+and the exact model ID from your provider. Eliot appends `/chat/completions`.
 
-# Start hacking!
-eliot-interactive
+Use an environment variable for a persistent key, or enter a temporary key in
+the provider form. A temporary key exists only in backend memory until that
+process exits. Saved profiles contain the environment variable name, not its value.
+Eliot does not return saved key values to the browser or place them in logs.
+Messages are sent to the selected provider; local storage does not make remote
+inference offline.
+
+For an environment-backed key, set it **before** starting the backend:
+
+```sh
+export ELIOT_API_KEY='your-api-key'
+eliot serve
 ```
 
-### **Build ELF Binaries**
-```bash
-# Build standalone ELF binaries
-chmod +x build_eliot_linux.sh
-./build_eliot_linux.sh
-
-# Install from package
-tar -xzf eliot-hacker-assistant-linux.tar.gz
-cd eliot-hacker-assistant
-sudo ./install.sh
+```powershell
+$env:ELIOT_API_KEY = 'your-api-key'
+eliot serve
 ```
 
----
+For a local model server, choose **No key**, its loopback API address and the
+model loaded by that server. Remote providers require HTTPS. Streaming can be
+disabled when an endpoint only supports standard JSON responses. Optional model
+parameters are explicit; Eliot does not force a temperature or token-limit field.
 
-## 🎮 **Usage Examples**
+**Test connection** sends a short model request and can incur provider charges.
+Opening the app, listing providers and running `doctor` make no provider requests.
+Tests distinguish missing/invalid keys, denied access, missing models/endpoints,
+rate limits, connection failures, invalid responses and timeouts. Retries are
+bounded and apply only to rate-limit and selected server-error responses; Eliot
+does not silently forward a failed request to another provider.
 
-### **Interactive Mode**
-```bash
-eliot-interactive
+Compatibility is with the **Chat Completions protocol**, not every feature of
+every model. Tools, images, custom authentication headers and the Responses API
+are not implemented in this alpha. Use a text chat model and the provider's exact
+parameter names. Optional `/models` discovery is not required.
 
-[USER] You: find gateway
-[AI] ELIOT: [Detects your LAN gateway: 192.168.1.1]
+## Use the terminal and browser together
 
-[USER] You: scan 192.168.1.0/24
-[AI] ELIOT: [Scans network and shows live hosts]
+Leave the backend running, then open another terminal in the same environment:
 
-[USER] You: do anything
-[AI] ELIOT: [Switches to autonomous mode]
+```sh
+eliot chat
+eliot sessions
+eliot chat --session SESSION_ID
+eliot chat --provider PROFILE_ID
+eliot export SESSION_ID > conversation.json
 ```
 
-### **Autonomous Mode**
-```bash
-eliot
-# ELIOT automatically discovers targets and attempts exploitation
+Within chat, `/new` creates a conversation, `/provider PROFILE_ID` changes the
+selected profile, and `/exit` exits. Ctrl+C during a response requests cancellation.
+The web **Stop** button cancels that same backend run. Stopping a response closes
+Eliot's request; the provider may still bill work already performed.
+
+Both interfaces see the same sessions and history. The web client includes a
+provider manager, recent conversations, streaming text, export, delete and run
+status. Failed/cancelled responses remain visible in run history and are excluded
+from future model context. Eliot sends the most recent completed turns, capped
+at 41 messages and 80,000 characters; it does not automatically summarize older
+history. All stored messages remain available for export.
+
+Provider management is also available in the terminal:
+
+```sh
+eliot providers list
+eliot providers add primary --base-url https://api.example.com/v1 --model exact-model-id --key-env ELIOT_API_KEY
+eliot providers add local --base-url http://127.0.0.1:1234/v1 --model local-model-id --no-auth
+eliot providers key primary
+eliot providers test primary
+eliot providers default primary
+eliot providers forget-key primary
+eliot providers delete primary
 ```
 
----
+The `key` command uses hidden input. `forget-key` removes the temporary backend
+key; it cannot unset the environment variable of a running process.
 
-## 🛠️ **Commands Reference**
+## Configuration and data
 
-### **Interactive Commands**
-- `find gateway` - Detect LAN gateway/router
-- `ping TARGET` - Ping a target host
-- `scan NETWORK` - Scan network range
-- `check vulnerabilities TARGET` - Run vulnerability scan
-- `exploit TARGET` - Attempt to exploit target
-- `test web URL` - Test web application
-- `brute force SERVICE TARGET` - Brute force attack
-- `help` - Show all commands
-- `do anything` - Switch to autonomous mode
-- `quit` - Exit ELIOT
+See [config.example.yaml](config.example.yaml) for the versioned schema.
+Configuration is saved atomically. Relative database paths are resolved against
+the configuration directory. Defaults are `config.yaml` and `data/eliot.db`.
+`ELIOT_CONFIG` selects another config file; `CONFIG_FILE` is a fallback for older
+deployment environments. A command-line `--config` takes precedence.
 
-### **System Commands**
-- `eliot --help` - Show autonomous mode help
-- `eliot --check` - Check system requirements
-- `eliot --config FILE` - Use custom config file
-
----
-
-## 🔧 **Configuration**
-
-### **Main Config File**
-```yaml
-# /etc/eliot/config.yaml
-llm:
-  providers:
-    - name: gemini
-      model: gemini-2.5-pro
-      api_keys: 
-        - "YOUR_GEMINI_API_KEY_1"
-        - "YOUR_GEMINI_API_KEY_2"
-      max_tokens: 4000
-      temperature: 0.7
-      priority: 1
-
-agent:
-  autonomous: false
-  interactive_mode: true
-  never_ask: false
-  continuous_mode: false
-  max_iterations: unlimited
-  decision_timeout: 30
-  retry_attempts: 5
-  escalation_threshold: 10
-
-database:
-  type: mongodb
-  connection_string: "mongodb+srv://user:pass@cluster.mongodb.net/database"
+```sh
+eliot --config remaster-config.yaml serve
+eliot --config remaster-config.yaml doctor
+eliot --server http://127.0.0.1:8876 chat
 ```
 
----
+The original `llm.providers` YAML format is not silently migrated; a clear error
+points to the example. Use a new path if you have an older `config.yaml`.
+Back up the configuration and database after clean backend shutdown. SQLite
+recovery marks unfinished runs interrupted on restart and preserves partial text.
+Configuration and session data are ignored by Git. SQLite is sufficient for
+this local, single-process release; MongoDB is not required.
 
-## 🏗️ **Architecture**
+The browser uses same-origin mutation tokens, host/origin checks and a restrictive
+content policy. Responses are rendered as text, not executable HTML. There is
+no network authentication layer for remote operation: do not expose this alpha
+through a reverse proxy or network tunnel. Other trusted local programs can
+access the backend as the local user.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    ELIOT ARCHITECTURE                       │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │              INTERACTIVE MODE                          │ │
-│  │  • Chat Interface (interactive_agent.py)              │ │
-│  │  • User Commands & Real-time Execution                │ │
-│  │  • Ethical Oversight & Target Validation              │ │
-│  │  • MCP Client Integration                              │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                │                             │
-│                                ▼                             │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │              AUTONOMOUS MODE                           │ │
-│  │  • AI Decision Making (autonomous_workflow.py)        │ │
-│  │  • Target Discovery & Profiling                       │ │
-│  │  • Automated Exploitation & Learning                  │ │
-│  │  • Multi-Provider LLM Management                      │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                │                             │
-│                                ▼                             │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │              CORE SYSTEM                               │ │
-│  │  • LLM Manager (OpenAI, Anthropic, Gemini, Ollama)    │ │
-│  │  • Intelligence Gathering & Exploit Development       │ │
-│  │  • Persistence Layer (MongoDB)                        │ │
-│  │  • Target Profiling & Vulnerability Scanning          │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+## Development and verification
+
+```sh
+python -m pip install -e '.[test]'
+python -m pytest -q
+python main.py doctor
+python -m pip wheel --no-deps .
 ```
 
-## 🔄 **Complete Workflow Diagram**
+Tests use isolated temporary databases, fake transports and selected legacy
+definitions; they do not call real providers or run security tools. CI is
+configured for Python 3.11/3.13 on Linux and Windows. A workflow being configured
+does not mean it has run remotely.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              ELIOT WORKFLOW                                    │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            SYSTEM INITIALIZATION                               │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│ 1. Load Configuration (config.yaml)                                            │
-│ 2. Initialize LLM Manager (Multi-provider support)                             │
-│ 3. Connect to MongoDB (Token tracking & persistence)                          │
-│ 4. Initialize MCP Client (Kali tools integration)                             │
-│ 5. Test API Keys (Real-time validation)                                       │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              MODE SELECTION                                    │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  ┌─────────────────────────┐                    ┌─────────────────────────┐    │
-│  │    INTERACTIVE MODE     │                    │   AUTONOMOUS MODE       │    │
-│  │                         │                    │                         │    │
-│  │ • Chat-based interface  │                    │ • Unattended operation  │    │
-│  │ • User-controlled       │                    │ • AI decision making    │    │
-│  │ • Real-time execution   │                    │ • Continuous scanning   │    │
-│  │ • Ethical oversight     │                    │ • Automated exploitation │    │
-│  └─────────────────────────┘                    └─────────────────────────┘    │
-│           │                                              │                      │
-│           ▼                                              ▼                      │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                          INTERACTIVE WORKFLOW                                  │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  User Input → Command Router → [Shell Commands | AI Processing]                │
-│       │              │                    │                    │               │
-│       ▼              ▼                    ▼                    ▼               │
-│  ┌─────────┐  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐           │
-│  │ Natural │  │   Direct    │    │   Shell     │    │     AI      │           │
-│  │Language │  │  Commands   │    │  Commands   │    │ Processing  │           │
-│  │ Request │  │ (help,quit) │    │ (ls,ping)   │    │ (scan,test) │           │
-│  └─────────┘  └─────────────┘    └─────────────┘    └─────────────┘           │
-│       │              │                    │                    │               │
-│       ▼              ▼                    ▼                    ▼               │
-│  ┌─────────┐  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐           │
-│  │Response │  │   Status    │    │ subprocess  │    │ LLM Manager │           │
-│  │ Display │  │  Messages   │    │   Direct    │    │   + MCP     │           │
-│  └─────────┘  └─────────────┘    └─────────────┘    └─────────────┘           │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                          AUTONOMOUS WORKFLOW                                   │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐            │
-│  │   DISCOVERY     │───▶│   PROFILING     │───▶│   RESEARCH      │            │
-│  │                 │    │                 │    │                 │            │
-│  │ • Network scan  │    │ • Service det.  │    │ • Vuln search   │            │
-│  │ • Host discov.  │    │ • OS detection  │    │ • Exploit find  │            │
-│  │ • Target enum.  │    │ • Port mapping  │    │ • CVE analysis  │            │
-│  └─────────────────┘    └─────────────────┘    └─────────────────┘            │
-│           │                       │                       │                   │
-│           ▼                       ▼                       ▼                   │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐            │
-│  │  EXPLOITATION   │◀───│   DECISION      │───▶│    LEARNING     │            │
-│  │                 │    │    MAKING       │    │                 │            │
-│  │ • Metasploit    │    │                 │    │ • Pattern anal. │            │
-│  │ • Custom exp.   │    │ • LLM reasoning │    │ • Success rate  │            │
-│  │ • Brute force   │    │ • Context eval  │    │ • Knowledge upd │            │
-│  └─────────────────┘    └─────────────────┘    └─────────────────┘            │
-│           │                       │                       │                   │
-│           ▼                       ▼                       ▼                   │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐            │
-│  │ POST-EXPLOIT    │    │   ESCALATION    │    │   PERSISTENCE   │            │
-│  │                 │    │                 │    │                 │            │
-│  │ • Session mgmt  │    │ • Priv. esc.    │    │ • Backdoor      │            │
-│  │ • Data extract  │    │ • Root access   │    │ • Cron jobs     │            │
-│  │ • Lateral mov.  │    │ • Admin rights  │    │ • Service reg   │            │
-│  └─────────────────┘    └─────────────────┘    └─────────────────┘            │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            CORE COMPONENTS                                     │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐            │
-│  │  LLM MANAGER    │    │   MCP CLIENT    │    │   DATABASE      │            │
-│  │                 │    │                 │    │                 │            │
-│  │ • OpenAI        │    │ • Kali tools    │    │ • MongoDB       │            │
-│  │ • Anthropic     │    │ • nmap, msf     │    │ • Experiences  │            │
-│  │ • Gemini        │    │ • hydra, sqlmap │    │ • Targets      │            │
-│  │ • Ollama        │    │ • nikto, gob.   │    │ • Sessions     │            │
-│  │ • API rotation  │    │ • Tool exec.    │    │ • Patterns     │            │
-│  └─────────────────┘    └─────────────────┘    └─────────────────┘            │
-│           │                       │                       │                   │
-│           ▼                       ▼                       ▼                   │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐            │
-│  │ INTELLIGENCE    │    │   EXPLOIT DEV   │    │   TARGETS       │            │
-│  │                 │    │                 │    │                 │            │
-│  │ • Web research  │    │ • Code gen.     │    │ • Scanner       │            │
-│  │ • Exploit search│    │ • Payload dev   │    │ • Profiler      │            │
-│  │ • CVE analysis  │    │ • Custom exp.   │    │ • Vuln detect   │            │
-│  │ • Threat intel  │    │ • Shellcode     │    │ • Service enum  │            │
-│  └─────────────────┘    └─────────────────┘    └─────────────────┘            │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            DATA FLOW                                            │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  Input → Processing → Execution → Results → Learning → Adaptation              │
-│    │         │           │          │         │           │                    │
-│    ▼         ▼           ▼          ▼         ▼           ▼                    │
-│  User    Command     Tool/MCP    Output    Pattern    Improved                 │
-│  Request  Router     Execution   Storage   Analysis   Decisions               │
-│                                                                                 │
-│  ┌─────────────────────────────────────────────────────────────────────────┐   │
-│  │                    CONTINUOUS LEARNING LOOP                            │   │
-│  │                                                                         │   │
-│  │  Experience → Analysis → Pattern Recognition → Knowledge Update        │   │
-│  │      │           │              │                    │                 │   │
-│  │      ▼           ▼              ▼                    ▼                 │   │
-│  │  Success/    Statistical    ML Analysis        Database Update         │   │
-│  │  Failure     Analysis       & Clustering       & Model Training        │   │
-│  └─────────────────────────────────────────────────────────────────────────┘   │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
+Code is organized under `eliot_app/`: configuration, provider gateway, storage,
+run service, HTTP API, terminal client and browser assets. `main.py` is a small
+entrypoint. The wheel includes the web assets and the supported remaster package.
 
----
+## Migration status
 
-## 📊 **Features**
+The remaster replaces the default launcher; the original main implementation
+is retained as `legacy_main.py`. Its heavyweight dependencies are separated in
+`requirements-legacy.txt`. `agent/`, `mcp_client.py` and historical installation
+scripts remain for reference and future migration. They are not part of the new
+shared chat backend, and the old installers are not the supported setup path.
 
-### **Interactive Mode**
-- ✅ Chat-based interface with natural language
-- ✅ Real-time command execution
-- ✅ User-controlled actions with ethical oversight
-- ✅ Step-by-step guidance and explanations
-- ✅ Target specification and validation
-- ✅ Seamless switch to autonomous mode
+The working source no longer embeds the exposed MongoDB credential. The old
+credential must still be revoked by its owner: source edits do not invalidate it
+or erase earlier Git history. No exposed credential was used during development.
 
-### **Autonomous Mode**
-- ✅ Unattended operation with AI decision making
-- ✅ Automatic target discovery and reconnaissance
-- ✅ Smart failure handling with alternative methods
-- ✅ Limited cycles (prevents infinite loops)
-- ✅ Minimal token usage for long-term operation
-- ✅ Learning from successful/failed attempts
+Legacy repairs also remove MongoDB `_id` before dataclass construction, respect
+the chosen config path, reload config after key changes, make tool/key handlers
+reachable, respect Gemini cooldowns and stop when the legacy model says COMPLETE.
+The legacy workflow persistence stubs, automatic vulnerability labels, generated
+code contract, external-session handling and historical packaging still need
+migration and validation. This release does not claim those features are fixed.
 
-### **Technical Features**
-- ✅ Multi-Provider LLM Support (OpenAI, Anthropic, Gemini, Ollama)
-- ✅ Advanced API key rotation and failover
-- ✅ MongoDB persistence for experience storage
-- ✅ MCP (Model Context Protocol) integration
-- ✅ Cross-platform support (Linux/Kali optimized)
-- ✅ Systemd service integration
-- ✅ ELF binary distribution (single executable)
-- ✅ Professional logging and monitoring
-- ✅ Self-learning and adaptation capabilities
-- ✅ Intelligence gathering and exploit development
-
----
-
-## 🛡️ **Security Notice**
-
-**⚠️ IMPORTANT: ELIOT is designed for authorized penetration testing only.**
-
-- Use only in controlled environments with proper authorization
-- Ensure legal compliance before testing any systems
-- User assumes full legal responsibility for all activities
-- Not intended for malicious or unauthorized activities
-- Follow ethical hacking guidelines and responsible disclosure
-
----
-
-## 📁 **Project Structure**
-
-```
-Eliot_THE_AI/
-├── agent/                          # Core agent modules
-│   ├── autonomous_workflow.py     # Autonomous workflow engine
-│   ├── core.py                    # Core agent functionality
-│   ├── interactive_agent.py       # Interactive chat interface
-│   ├── llm_manager.py            # Multi-provider LLM management
-│   ├── config_manager.py         # Configuration management
-│   ├── exploit_dev/              # Exploit development tools
-│   ├── intelligence/             # Intelligence gathering modules
-│   ├── learning/                 # Self-learning capabilities
-│   ├── persistence/              # Database and logging
-│   ├── targets/                  # Target profiling and scanning
-│   └── tools/                    # Pentesting tool integrations
-├── main.py                       # Main application entry point
-├── interactive_main.py           # Interactive mode entry point
-├── run_agent.py                  # Agent runner
-├── start_agent.py                # Agent starter
-├── mcp_client.py                 # MCP server client
-├── config.yaml                   # Configuration template
-├── requirements.txt              # Python dependencies
-├── build_eliot_linux.sh          # ELF binary builder
-├── deploy_eliot_kali.sh          # Kali Linux deployment
-├── ELIOT_DEPLOYMENT_GUIDE.md     # Complete deployment guide
-├── DATABASE_SETUP.md             # MongoDB setup guide
-└── README.md                     # This file
-```
-
----
-
-## 🐛 **Troubleshooting**
-
-### **Common Issues**
-
-**MongoDB Connection Error**
-```bash
-# Check MongoDB status
-sudo systemctl status mongodb
-sudo systemctl start mongodb
-
-# Or configure Atlas connection in config.yaml
-```
-
-**API Key Issues**
-```bash
-# Verify API keys in configuration
-sudo nano /etc/eliot/config.yaml
-eliot --check
-```
-
-**Permission Errors**
-```bash
-# Fix permissions
-sudo chown -R eliot:eliot /opt/eliot
-sudo chown -R eliot:eliot /var/log/eliot
-```
-
----
-
-## 🤝 **Contributing**
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📄 **License**
-
-This project is for educational and authorized testing purposes only. See [LICENSE](LICENSE) for details.
-
----
-
-## 👨‍💻 **Author**
-
-**ELIOT - THE AI HACKER ASSISTANT**  
-**by Bikram@2003**
-
----
-
-## 🙏 **Acknowledgments**
-
-- Gemini 2.5 Pro for AI capabilities
-- Kali Linux community for penetration testing tools
-- Open source security tools (nmap, metasploit, sqlmap, etc.)
-
----
-
-## 📞 **Support**
-
-- 📖 **Documentation**: [ELIOT_DEPLOYMENT_GUIDE.md](ELIOT_DEPLOYMENT_GUIDE.md)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/your-username/Eliot_THE_AI/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/your-username/Eliot_THE_AI/discussions)
-
----
-
-## 🎉 **Ready to Hack!**
-
-ELIOT is ready to assist you with your penetration testing tasks. Remember to use it responsibly and ethically!
-
-```bash
-# Start hacking with ELIOT!
-eliot-interactive
-```
-
----
-
-**ELIOT - THE AI HACKER ASSISTANT by Bikram@2003** 🚀
-
-
-*"Intelligence meets penetration testing"*
+Next milestones: validated tool registry and evidence records, reliable transport
+adapters, scoped jobs, verified findings, bounded workflows, and Linux installation
+validation. Keep the original attribution and license when redistributing.

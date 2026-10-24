@@ -111,8 +111,8 @@ class SafetyConfig:
 class ConfigManager:
     """Manages configuration loading and validation"""
     
-    def __init__(self, config_path: str = "config.yaml"):
-        self.config_path = config_path
+    def __init__(self, config_path: Optional[str] = None):
+        self.config_path = config_path or os.getenv("CONFIG_FILE", "config.yaml")
         self.config_data = self._load_config()
         
         # Initialize configuration objects
@@ -128,8 +128,11 @@ class ConfigManager:
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from YAML file"""
         try:
-            with open(self.config_path, 'r') as file:
-                return yaml.safe_load(file)
+            with open(self.config_path, 'r', encoding='utf-8') as file:
+                data = yaml.safe_load(file) or {}
+                if not isinstance(data, dict):
+                    raise ValueError("Configuration must be a YAML mapping")
+                return data
         except FileNotFoundError:
             print(f"Config file {self.config_path} not found. Using default configuration.")
             return {}
