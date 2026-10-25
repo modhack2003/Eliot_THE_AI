@@ -637,6 +637,65 @@ main {
     transparent 70%
   );
   filter: blur(18px);
+  transition:
+    background 0.8s ease,
+    opacity 0.8s ease;
+}
+/* Depth bloom that intensifies with recorded activity. Decorative only. */
+.neural-stage::after {
+  content: "";
+  position: absolute;
+  inset: 6% 2%;
+  z-index: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 48%,
+    #86d0e81f,
+    transparent 62%
+  );
+  opacity: 0.6;
+  filter: blur(26px);
+  transition:
+    background 0.8s ease,
+    opacity 0.8s ease,
+    transform 0.8s ease;
+}
+body[data-activity="working"] .core-halo {
+  background: radial-gradient(ellipse, #8fe0f23a, #4fb6dc18 45%, transparent 70%);
+}
+body[data-activity="working"] .neural-stage::after {
+  opacity: 1;
+  background: radial-gradient(circle at 50% 48%, #9ae6ff33, transparent 64%);
+}
+body[data-activity="attention"] .core-halo {
+  background: radial-gradient(ellipse, #e0bd7e30, #c79a5214 45%, transparent 70%);
+}
+body[data-activity="attention"] .neural-stage::after {
+  background: radial-gradient(circle at 50% 48%, #f2cd7a2b, transparent 64%);
+}
+/* A breathing pulse while active; fully suppressed when motion is paused. */
+body[data-activity="working"]:not(.motion-paused) .neural-stage::after {
+  animation: core-breathe 3.6s ease-in-out infinite;
+}
+@keyframes core-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.985);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+.motion-paused .neural-stage::after {
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .neural-stage::after {
+    animation: none !important;
+  }
 }
 .core-coordinate {
   position: absolute;
