@@ -10,6 +10,7 @@
     />
     <title>Eliot · Intelligence workspace</title>
     <link rel="stylesheet" href="/static/style.css" />
+    <script src="/static/transport.js" defer></script>
     <script src="/static/app.js" defer></script>
     <script src="/static/workspace.js" defer></script>
     <script src="/static/neural.js" defer></script>
@@ -371,6 +372,8 @@
                 <option value="all">All statuses</option>
                 <option value="active">Active</option>
                 <option value="attention">Needs attention</option>
+                <option value="paused">Paused</option>
+                <option value="cancelled">Cancelled</option>
                 <option value="completed">Completed</option></select
               ><button
                 id="refresh-missions"
@@ -892,13 +895,22 @@
           ×
         </button>
       </div>
-      <p id="skill-description" class="skill-description"></p>
+      <details id="skill-about" class="skill-about">
+        <summary>About this skill</summary>
+        <p id="skill-description" class="skill-description"></p>
+      </details>
       <div class="skill-provenance">
         <span id="skill-revision"></span
         ><a id="skill-source" target="_blank" rel="noopener noreferrer"
           >View upstream ↗</a
         >
       </div>
+      <label id="skill-resource-label" hidden
+        >Guide or reference<select
+          id="skill-resource"
+          aria-label="Guide or reference"
+        ></select
+      ></label>
       <pre id="skill-content" class="skill-content"></pre>
       <button id="skill-more" class="secondary-button" hidden>
         Read next page ↓

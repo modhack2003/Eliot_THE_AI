@@ -1,7 +1,6 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
-let token = "",
-  profiles = [],
+let profiles = [],
   currentSession = null,
   currentRun = null,
   source = null,
@@ -9,22 +8,12 @@ let token = "",
 let noticeTimer,
   submitting = false;
 
-async function api(path, method = "GET", body) {
-  const options = { method, headers: { "X-Eliot-Token": token } };
-  if (body !== undefined) {
-    options.headers["Content-Type"] = "application/json";
-    options.body = JSON.stringify(body);
-  }
-  const response = await fetch(path, options);
-  const value = await response.json();
-  if (!response.ok)
-    throw new Error(
-      typeof value.detail === "string"
-        ? value.detail
-        : "The request could not be completed.",
-    );
-  return value;
-}
+const transport = new EliotTransport.Client();
+const api = (path, method = "GET", body) =>
+  transport.request(path, method, body);
+let workspaceReady = false,
+  initializing = null,
+  streamConnected = true;
 function notice(message, error = false) {
   clearTimeout(noticeTimer);
   $("notice").textContent = message;
@@ -115,6 +104,7 @@ function detach() {
   if (source) source.close();
   source = null;
   currentRun = null;
+  streamConnected = true;
 }
 function newChat() {
   if (submitting) return;
@@ -222,39 +212,46 @@ function updateComposer() {
   $("chat-persona").disabled = busy;
   updateActivity();
   $("run-status").textContent = busy
-    ? "Eliot is responding…"
+    ? streamConnected
+      ? "Eliot is responding…"
+      : "Reconnecting to the saved response…"
     : profiles.length
       ? "Ready when you are"
       : "Connect a provider to begin";
 }
 function watch(id, article) {
-  if (source) source.close();
-  source = new EventSource(`/api/runs/${id}/events`);
-  source.onmessage = (event) => {
-    const run = JSON.parse(event.data);
-    const nearBottom =
-      $("conversation").scrollHeight -
-        $("conversation").scrollTop -
-        $("conversation").clientHeight <
-      150;
-    renderRun(run, article);
-    if (nearBottom) scrollBottom();
-    if (!["queued", "running"].includes(run.status)) {
+  source?.close();
+  source = new EliotTransport.RunWatch(id, {
+    request: api,
+    onConnection(connected) {
+      streamConnected = connected;
+      updateComposer();
+    },
+    onMissing() {
       detach();
       updateComposer();
-      refreshSessions().catch((e) => notice(e.message, true));
-      $("message").focus();
-    }
-  };
-  source.onerror = () => {
-    source?.close();
-    source = null;
-    notice(
-      "The live connection was interrupted. Refresh this conversation to check its status.",
-      true,
-    );
-    updateComposer();
-  };
+      notice(
+        "This response is no longer available. Open its conversation to refresh the record.",
+        true,
+      );
+    },
+    onUpdate(run) {
+      const nearBottom =
+        $("conversation").scrollHeight -
+          $("conversation").scrollTop -
+          $("conversation").clientHeight <
+        150;
+      renderRun(run, article);
+      if (nearBottom) scrollBottom();
+      if (!["queued", "running"].includes(run.status)) {
+        detach();
+        updateComposer();
+        refreshSessions().catch((e) => notice(e.message, true));
+        if (!$("chat-view").hidden && !document.querySelector("dialog[open]"))
+          $("message").focus();
+      }
+    },
+  });
 }
 $("chat-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -508,16 +505,24 @@ $("provider-dialog").addEventListener("close", () => {
   $("p-key").value = "";
 });
 async function init() {
+  if (initializing) return initializing;
+  initializing = (async () => {
+    try {
+      const state = await api("/api/bootstrap");
+      $("version").textContent = "Eliot " + state.version;
+      await refreshProviders();
+      await refreshSessions();
+      await initWorkspace();
+      workspaceReady = true;
+      setConnection(true);
+    } catch (e) {
+      setConnection(false);
+    }
+  })();
   try {
-    const state = await api("/api/bootstrap");
-    token = state.token;
-    $("version").textContent = "Eliot " + state.version;
-    await refreshProviders();
-    await refreshSessions();
-    await initWorkspace();
-  } catch (e) {
-    setConnection(false);
-    notice("Could not open the workspace. " + e.message, true);
+    await initializing;
+  } finally {
+    initializing = null;
   }
 }
-// workspace.js starts initialization after registering the mission and library controls.
+// workspace.js starts initialization after registering dashboard controls.

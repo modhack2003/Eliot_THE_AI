@@ -2499,3 +2499,13 @@ label textarea {
     padding-top: 14px;
   }
 }
+
+.skill-about {
+  margin: 16px 0;
+  color: #a8c0d0;
+  font-size: 12px;
+}
+.skill-about summary {
+  cursor: pointer;
+  padding: 8px 0;
+}

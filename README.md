@@ -7,8 +7,8 @@ Connect an OpenAI-compatible Chat Completions endpoint, select its exact model I
 and use your own API key. Local model servers can run without authentication.
 Conversations and run history are stored in SQLite on your machine.
 
-Version **2.0.0a4** adds a new animated intelligence workspace, browser mission
-controls and a searchable skills/persona library on top of one-command
+Version **2.0.0a5** improves mission checkpoint recovery and browser reconnection,
+and opens bundled skill references inside the animated workspace. It builds on one-command
 installation and the durable cybersecurity agent core: coordinator/worker
 tasks, typed evidence tools, scoped observations, checkpoints, completion review,
 uploaded personas and 83 default skill modules. Ordinary conversation remains

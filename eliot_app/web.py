@@ -109,7 +109,7 @@ def create_app(config_path=None, gateway=None):
             return JSONResponse({"detail": "Cross-origin requests are not allowed."}, status_code=403)
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
             if not secrets.compare_digest(request.headers.get("x-eliot-token", ""), csrf_token):
-                return JSONResponse({"detail": "Refresh the page or reconnect the terminal client."}, status_code=403)
+                return JSONResponse({"detail": "Refresh the page or reconnect the terminal client.", "code": "invalid_request_token"}, status_code=403)
             try:
                 if int(request.headers.get("content-length", "0")) > 100_000:
                     return JSONResponse({"detail": "Request is too large."}, status_code=413)
@@ -248,8 +248,8 @@ def create_app(config_path=None, gateway=None):
         return missions.catalog.list()
 
     @app.get("/api/skills/{skill_id}")
-    async def skill_page(skill_id: str, start_line: int = 1):
-        return missions.catalog.read(skill_id, start_line=start_line, limit=120)
+    async def skill_page(skill_id: str, start_line: int = 1, resource: str = "SKILL.md"):
+        return missions.catalog.read(skill_id, resource=resource, start_line=start_line, limit=120)
 
     @app.get("/api/personas")
     async def personas():

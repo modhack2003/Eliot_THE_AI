@@ -289,3 +289,95 @@ def test_task_api_and_readonly_system_prompt(tmp_path):
         assert client.get(f'/api/tasks/{mission["id"]}').status_code == 200
         assert client.get(f'/api/tasks/{mission["id"]}/events').status_code == 200
         assert client.post(f'/api/tasks/{mission["id"]}/feedback',json={"text":"Use supplied evidence"}).status_code == 200
+
+async def test_budget_resume_keeps_original_delegation(tmp_path):
+    runtime = setup_runtime(tmp_path, Planner(delegate=True))
+    mission = runtime.create("Review evidence as a team", str(tmp_path), max_steps=1)
+    root = await finished(runtime, mission["id"])
+    children = [m for m in runtime.store.list(root["id"]) if m["parent_id"]]
+    assert root["status"] == "budget_exhausted"
+    assert len(children) == 2
+    original_ids = {m["id"] for m in children}
+    assert root["state"]["pending"]["action"] == "delegate"
+    await runtime.control(root["id"], "resume", max_steps=0)
+    assert (await finished(runtime, root["id"]))["status"] == "completed"
+    children = [m for m in runtime.store.list(root["id"]) if m["parent_id"]]
+    assert {m["id"] for m in children} == original_ids
+    assert all(m["status"] == "completed" for m in children)
+
+
+async def test_pausing_worker_does_not_orphan_coordinator(tmp_path):
+    entered, release = asyncio.Event(), asyncio.Event()
+    class WaitingWorkers(Planner):
+        async def complete(self, provider, messages, on_delta=None):
+            if '"role": "worker"' in messages[-1]["content"]:
+                entered.set()
+                await release.wait()
+            return await super().complete(provider, messages, on_delta)
+    runtime = setup_runtime(tmp_path, WaitingWorkers(delegate=True))
+    root = runtime.create("Review with workers", str(tmp_path))
+    await asyncio.wait_for(entered.wait(), 2)
+    children = [m for m in runtime.store.list(root["id"]) if m["parent_id"]]
+    await runtime.control(children[0]["id"], "pause")
+    release.set()
+    assert (await finished(runtime, root["id"]))["status"] == "paused"
+    await runtime.control(root["id"], "resume")
+    assert (await finished(runtime, root["id"]))["status"] == "completed"
+    assert len(runtime.store.list(root["id"])) == 3
+
+
+async def test_worker_cannot_resume_under_finished_or_paused_coordinator(tmp_path):
+    runtime = setup_runtime(tmp_path)
+    root = runtime.create("Review", str(tmp_path))
+    await runtime.control(root["id"], "pause")
+    child = runtime.store.create("Worker", root["provider_id"], root["workspace"], root["persona"], [], root["policy"], parent=root)
+    runtime.store.save(child["id"], status="paused")
+    for status in ("paused", "completed", "cancelled", "budget_exhausted"):
+        runtime.store.save(root["id"], status=status)
+        with pytest.raises(ConfigError, match="coordinator"):
+            await runtime.control(child["id"], "resume")
+        assert child["id"] not in runtime.tasks
+
+
+@pytest.mark.parametrize("clear_explicitly", [False, True])
+async def test_optional_memory_preserves_or_explicitly_clears_context(tmp_path, clear_explicitly):
+    class Remembering(Planner):
+        async def complete(self, provider, messages, on_delta=None):
+            reply = await super().complete(provider, messages, on_delta)
+            data = json.loads(reply.text)
+            if data.get("action") == "tool":
+                data["memory"] = "Keep this evidence observation"
+                data["plan"] = ["Review the observation"]
+            elif data.get("action") == "complete":
+                data.pop("memory", None)
+                if clear_explicitly:
+                    data.update(memory="", plan=[])
+            return Reply(json.dumps(data), "stop", {"total_tokens":10})
+    runtime = setup_runtime(tmp_path, Remembering())
+    root = runtime.create("Review", str(tmp_path))
+    result = await finished(runtime, root["id"])
+    assert result["state"]["memory"] == ("" if clear_explicitly else "Keep this evidence observation")
+    assert result["state"]["plan"] == ([] if clear_explicitly else ["Review the observation"])
+
+
+async def test_finished_task_cleanup_cannot_remove_replacement(tmp_path):
+    runtime = setup_runtime(tmp_path)
+    release = asyncio.Event()
+    calls = 0
+    async def run(mission_id):
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            await release.wait()
+    runtime._run = run
+    first = runtime.start("slot")
+    await asyncio.sleep(0)
+    assert first.done()
+    replacement = runtime.start("slot")
+    assert replacement is not first
+    await asyncio.sleep(0)
+    assert runtime.tasks["slot"] is replacement
+    release.set()
+    await replacement
+    await asyncio.sleep(0)
+    assert "slot" not in runtime.tasks

@@ -22,3 +22,6 @@ jobs:
           node --check eliot_app/static/app.js
           node --check eliot_app/static/workspace.js
           node --check eliot_app/static/neural.js
+          node --check eliot_app/static/transport.js
+      - name: Test connection recovery
+        run: node --test tests/javascript/transport.test.cjs

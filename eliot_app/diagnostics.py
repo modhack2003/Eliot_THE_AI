@@ -63,7 +63,7 @@ def diagnose(config=None, require_nmap=False):
                        else "Connect your API endpoint, model and key in the web interface."})
 
     def assets():
-        for name in ("index.html", "style.css", "app.js", "workspace.js", "neural.js"):
+        for name in ("index.html", "style.css", "app.js", "workspace.js", "neural.js", "transport.js"):
             if not (Path(__file__).parent / "static" / name).is_file():
                 raise ValueError(f"Missing web asset: {name}")
         return "All browser assets present"

@@ -88,11 +88,15 @@ class MissionRuntime:
         return mission
 
     def start(self, mission_id):
-        if mission_id in self.tasks:
-            return self.tasks[mission_id]
+        existing = self.tasks.get(mission_id)
+        if existing and not existing.done():
+            return existing
         task = asyncio.create_task(self._run(mission_id))
         self.tasks[mission_id] = task
-        task.add_done_callback(lambda done: self.tasks.pop(mission_id, None))
+        def clear_slot(done):
+            if self.tasks.get(mission_id) is done:
+                self.tasks.pop(mission_id, None)
+        task.add_done_callback(clear_slot)
         return task
 
     def recover(self):
@@ -107,6 +111,10 @@ class MissionRuntime:
         if action == "resume":
             if mission["status"] not in {"paused", "blocked", "budget_exhausted"}:
                 raise ConfigError("Only paused, blocked or budget-exhausted tasks can be resumed.")
+            if mission["parent_id"]:
+                coordinator = self.store.get(mission["root_id"])
+                if coordinator["status"] in TERMINAL:
+                    raise ConfigError("Resume the coordinator before an individual worker; finished coordinators cannot resume workers.")
             state = mission["state"]
             state["stalls"] = 0
             if mission["status"] == "blocked":
@@ -124,8 +132,8 @@ class MissionRuntime:
                     self.store.save(item["id"], policy=policy)
             self.store.save(mission_id, status="queued", reason="", state=state)
             for child in self.store.list(mission["root_id"]):
-                if child["parent_id"] == mission_id and child["status"] == "paused":
-                    self.store.save(child["id"], status="queued")
+                if child["parent_id"] == mission_id and child["status"] in {"paused", "budget_exhausted"}:
+                    self.store.save(child["id"], status="queued", reason="")
             self.start(mission_id)
         elif action in {"pause", "cancel"}:
             if mission["status"] in {"completed", "cancelled"}:
@@ -208,7 +216,12 @@ class MissionRuntime:
                             self.store.save(mission_id, status="blocked", reason="The provider repeatedly returned invalid task decisions.")
                             return
                         continue
-                    state.update(pending=decision.model_dump(), memory=decision.memory, plan=[p[:1000] for p in decision.plan])
+                    state["pending"] = decision.model_dump()
+                    # Omitted fields preserve factual context; an explicit empty value clears it.
+                    if "memory" in decision.model_fields_set:
+                        state["memory"] = decision.memory
+                    if "plan" in decision.model_fields_set:
+                        state["plan"] = [p[:1000] for p in decision.plan]
                     self.store.save(mission_id, state=state, steps=mission["steps"]+1)
                     self.store.event(mission_id, "decision", {"summary": decision.summary, "action": decision.action})
                 progressed = await self._decision(self.store.get(mission_id), decision)
@@ -298,9 +311,18 @@ class MissionRuntime:
                     self.store.save(child_id, state={**child["state"], "provider_snapshot": mission["state"].get("provider_snapshot")})
                 children.append(child)
             self.store.event(mission_id, "delegated", {"children": [c["id"] for c in children]})
-            await asyncio.gather(*(self.start(c["id"]) for c in children if c["status"] not in TERMINAL))
+            await asyncio.gather(*(self.start(c["id"]) for c in children if c["status"] not in TERMINAL), return_exceptions=True)
             results = [{"id": c["id"], "status": self.store.get(c["id"])["status"], "result": self.store.get(c["id"])["result"][:10_000], "reason": self.store.get(c["id"])["reason"]} for c in children]
             self.store.event(mission_id, "child_results", {"children": results})
+            # Keep this delegation checkpoint until suspended workers can finish.
+            # Resuming reuses their deterministic IDs instead of delegating duplicates.
+            statuses = {c["status"] for c in results}
+            if "paused" in statuses:
+                self.store.save(mission_id, status="paused", reason="A worker is paused. Resume the coordinator to continue the saved team.")
+                return False
+            if "budget_exhausted" in statuses:
+                self.store.save(mission_id, status="budget_exhausted", reason="The team reached its configured budget. Extend the coordinator budget to continue existing workers.")
+                return False
             return any(c["status"] == "completed" for c in results)
         if decision.action == "complete":
             valid = set(self.store.evidence(mission))

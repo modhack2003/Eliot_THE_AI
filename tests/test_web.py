@@ -144,7 +144,32 @@ def test_skill_reader_pages_and_invalid_requests(workspace):
 def test_all_workspace_assets_are_served(workspace):
     client, _, _, _ = workspace
     html = client.get("/").text
-    for asset in ("style.css", "app.js", "workspace.js", "neural.js"):
+    for asset in ("style.css", "app.js", "workspace.js", "neural.js", "transport.js"):
         assert f"/static/{asset}" in html
         response = client.get(f"/static/{asset}")
         assert response.status_code == 200 and len(response.content) > 100
+
+
+def test_token_refresh_signal_is_distinct_from_origin_denial(workspace):
+    client, _, _, _ = workspace
+    expired = client.post("/api/sessions", json={}, headers={"X-Eliot-Token": "stale"})
+    assert expired.status_code == 403
+    assert expired.json()["code"] == "invalid_request_token"
+    denied = client.post("/api/sessions", json={}, headers={"Origin": "https://attacker.example", "X-Eliot-Token": "stale"})
+    assert denied.status_code == 403
+    assert denied.json().get("code") != "invalid_request_token"
+    assert client.get("/api/sessions").json() == []
+
+
+def test_skill_reference_reader_enforces_pinned_paths(workspace):
+    from eliot_app.instructions import SkillCatalog
+    client, _, requests, _ = workspace
+    path = "/api/skills/offensive-osint"
+    resource = "references/recon-stack.md"
+    page = client.get(path, params={"resource": resource})
+    assert page.status_code == 200
+    assert page.json() == SkillCatalog().read("offensive-osint", resource=resource)
+    assert resource in page.json()["resources"]
+    for resource in ("../../manifest.json", "../triage-validation/SKILL.md", "missing.md", "/etc/passwd"):
+        assert client.get(path, params={"resource": resource}).status_code == 400
+    assert requests == []

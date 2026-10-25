@@ -1,6 +1,20 @@
 # Changes
 
-## 2.0.0a4 � 25 October 2026
+## 2.0.0a5 — 25 October 2026
+
+- Preserved delegation checkpoints when workers pause or exhaust a budget;
+  extending the coordinator budget now resumes its existing team.
+- Preserved saved memory and plans when a model omits those optional fields.
+- Fixed task-start cleanup races and prevented worker resumes under stopped coordinators.
+- Added chat stream reconnection with stored-status recovery, bounded backoff,
+  missing-record handling and protection against stale stream updates.
+- Added automatic refresh of expired local request tokens, request timeouts,
+  startup recovery and restoration after browser back/forward navigation.
+- Added bundled reference documents to the skill reader and paused/cancelled
+  mission filters; reference reads remain restricted to verified bundle files.
+- Added mission, API and browser-transport regression tests, including CI coverage.
+
+## 2.0.0a4 — 25 October 2026
 
 - Rebuilt the browser workspace with obsidian glass, cyan/amber accents and a
   procedural animated neural core driven by actual task/chat activity.

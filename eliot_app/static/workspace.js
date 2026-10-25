@@ -10,6 +10,7 @@ let missions = [],
   pollTimer;
 let currentSkill = null,
   nextSkillLine = 1,
+  skillResource = "SKILL.md",
   skillGeneration = 0;
 const activeStatuses = ["queued", "running", "retrying"];
 const attentionStatuses = ["blocked", "budget_exhausted"];
@@ -532,6 +533,10 @@ function renderSkills() {
 $("skill-search").oninput = renderSkills;
 async function openSkill(skill) {
   currentSkill = skill;
+  $("skill-about").open = false;
+  skillResource = "SKILL.md";
+  $("skill-resource").replaceChildren();
+  $("skill-resource-label").hidden = true;
   nextSkillLine = 1;
   skillGeneration++;
   $("skill-title").textContent = skill.id.replaceAll("-", " ");
@@ -548,11 +553,26 @@ async function loadSkillPage(first = false) {
   $("skill-more").disabled = true;
   try {
     const page = await api(
-      `/api/skills/${encodeURIComponent(currentSkill.id)}?start_line=${nextSkillLine}`,
+      `/api/skills/${encodeURIComponent(currentSkill.id)}?start_line=${nextSkillLine}&resource=${encodeURIComponent(skillResource)}`,
     );
     if (generation !== skillGeneration) return;
-    if (first) $("skill-content").textContent = page.text;
-    else $("skill-content").textContent += "\n" + page.text;
+    if (first) {
+      $("skill-content").textContent = page.text;
+      $("skill-resource").replaceChildren(
+        ...page.resources.map((resource) => {
+          const option = node(
+            "option",
+            "",
+            resource === "SKILL.md" ? "Main guide" : resource,
+          );
+          option.value = resource;
+          return option;
+        }),
+      );
+      $("skill-resource").value = skillResource;
+      $("skill-resource-label").hidden = page.resources.length < 2;
+      $("skill-content").scrollTop = 0;
+    } else $("skill-content").textContent += "\n" + page.text;
     nextSkillLine = page.end_line + 1;
     $("skill-more").hidden = !page.has_more;
   } catch (e) {
@@ -561,10 +581,18 @@ async function loadSkillPage(first = false) {
       notice(e.message, true);
     }
   } finally {
-    $("skill-more").disabled = false;
+    if (generation === skillGeneration) $("skill-more").disabled = false;
   }
 }
 $("skill-more").onclick = () => loadSkillPage();
+$("skill-resource").onchange = () => {
+  skillResource = $("skill-resource").value;
+  nextSkillLine = 1;
+  skillGeneration++;
+  $("skill-content").textContent = "Loading verified guidance…";
+  $("skill-more").hidden = true;
+  loadSkillPage(true);
+};
 $("skill-dialog").addEventListener("close", () => skillGeneration++);
 async function refreshPersonas() {
   personas = await api("/api/personas");
@@ -655,6 +683,10 @@ async function pollWorkspace() {
   if (polling || document.hidden) return;
   polling = true;
   try {
+    if (!workspaceReady) {
+      await init();
+      return;
+    }
     await refreshMissions();
     if (!$("missions-view").hidden) await refreshTask();
     setConnection(true);
@@ -672,8 +704,6 @@ async function initWorkspace() {
   await refreshPersonas();
   await refreshMissions();
   setConnection(true);
-  clearInterval(pollTimer);
-  pollTimer = setInterval(pollWorkspace, 3000);
 }
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) pollWorkspace();
@@ -715,4 +745,18 @@ $("resume-form").onsubmit = async (event) => {
     $("resume-submit").disabled = false;
   }
 };
+function startWorkspacePolling() {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(pollWorkspace, 3000);
+}
+window.addEventListener("pageshow", (event) => {
+  if (!event.persisted) return;
+  startWorkspacePolling();
+  pollWorkspace();
+  if (currentRun) {
+    const article = $("messages").querySelector(`[data-run="${currentRun}"]`);
+    if (article) watch(currentRun, article);
+  }
+});
+startWorkspacePolling();
 init();
