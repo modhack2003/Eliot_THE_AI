@@ -104,7 +104,11 @@ function updateActivity() {
     : attention
       ? "NEEDS ATTENTION"
       : "STANDING BY";
-  $("core-state").textContent = working
+  // The core's own state label is owned by the emotion renderer, which has a
+  // finer grained view (thinking and talking) than mission activity alone.
+  document.dispatchEvent(new Event("eliot-emotion"));
+  if (!document.getElementById("neural-canvas"))
+    $("core-state").textContent = working
     ? "ACTIVE · PROCESSING SIGNALS"
     : attention
       ? "PAUSED · INPUT REQUIRED"

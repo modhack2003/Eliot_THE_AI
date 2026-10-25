@@ -606,8 +606,60 @@ main {
 .neural-stage {
   position: relative;
   min-width: 0;
-  height: 355px;
+  height: 420px;
   isolation: isolate;
+}
+/* Corner brackets frame the core like an instrument viewport. */
+.neural-stage::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  z-index: 4;
+  pointer-events: none;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--core-tint, #8fd4e8) 0 0) left 0 top 0 / 14px 1px no-repeat,
+    linear-gradient(var(--core-tint, #8fd4e8) 0 0) left 0 top 0 / 1px 14px no-repeat,
+    linear-gradient(var(--core-tint, #8fd4e8) 0 0) right 0 top 0 / 14px 1px no-repeat,
+    linear-gradient(var(--core-tint, #8fd4e8) 0 0) right 0 top 0 / 1px 14px no-repeat,
+    linear-gradient(var(--core-tint, #8fd4e8) 0 0) left 0 bottom 0 / 14px 1px no-repeat,
+    linear-gradient(var(--core-tint, #8fd4e8) 0 0) left 0 bottom 0 / 1px 14px no-repeat,
+    linear-gradient(var(--core-tint, #8fd4e8) 0 0) right 0 bottom 0 / 14px 1px no-repeat,
+    linear-gradient(var(--core-tint, #8fd4e8) 0 0) right 0 bottom 0 / 1px 14px no-repeat;
+  opacity: 0.5;
+  transition: opacity 0.7s ease;
+}
+/* Emotion tints the surrounding chrome, so the whole stage shifts with mood. */
+body[data-emotion="thinking"] .neural-stage {
+  --core-tint: #8f93f2;
+}
+body[data-emotion="talking"] .neural-stage {
+  --core-tint: #b4ecff;
+}
+body[data-emotion="working"] .neural-stage {
+  --core-tint: #d8f5ff;
+}
+body[data-emotion="alert"] .neural-stage {
+  --core-tint: #f2b76b;
+}
+body[data-emotion="working"] .neural-stage::before,
+body[data-emotion="alert"] .neural-stage::before {
+  opacity: 0.95;
+}
+.core-coordinate span,
+.core-live-dot {
+  transition:
+    color 0.7s ease,
+    background 0.7s ease,
+    box-shadow 0.7s ease;
+}
+body[data-emotion="alert"] .core-live-dot {
+  background: #f0a95c;
+  box-shadow: 0 0 10px #f2b76b;
+}
+body[data-emotion="thinking"] .core-live-dot {
+  background: #9497f5;
+  box-shadow: 0 0 10px #9aa0ff;
 }
 .neural-stage canvas {
   width: 100%;
@@ -637,6 +689,65 @@ main {
     transparent 70%
   );
   filter: blur(18px);
+  transition:
+    background 0.8s ease,
+    opacity 0.8s ease;
+}
+/* Depth bloom that intensifies with recorded activity. Decorative only. */
+.neural-stage::after {
+  content: "";
+  position: absolute;
+  inset: 6% 2%;
+  z-index: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 48%,
+    #86d0e81f,
+    transparent 62%
+  );
+  opacity: 0.6;
+  filter: blur(26px);
+  transition:
+    background 0.8s ease,
+    opacity 0.8s ease,
+    transform 0.8s ease;
+}
+body[data-activity="working"] .core-halo {
+  background: radial-gradient(ellipse, #8fe0f23a, #4fb6dc18 45%, transparent 70%);
+}
+body[data-activity="working"] .neural-stage::after {
+  opacity: 1;
+  background: radial-gradient(circle at 50% 48%, #9ae6ff33, transparent 64%);
+}
+body[data-activity="attention"] .core-halo {
+  background: radial-gradient(ellipse, #e0bd7e30, #c79a5214 45%, transparent 70%);
+}
+body[data-activity="attention"] .neural-stage::after {
+  background: radial-gradient(circle at 50% 48%, #f2cd7a2b, transparent 64%);
+}
+/* A breathing pulse while active; fully suppressed when motion is paused. */
+body[data-activity="working"]:not(.motion-paused) .neural-stage::after {
+  animation: core-breathe 3.6s ease-in-out infinite;
+}
+@keyframes core-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.985);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+.motion-paused .neural-stage::after {
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .neural-stage::after {
+    animation: none !important;
+  }
 }
 .core-coordinate {
   position: absolute;
