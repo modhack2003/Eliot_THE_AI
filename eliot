@@ -1,4 +1,10 @@
 #!/bin/sh
 # Run from this source checkout, including paths containing spaces.
 ELIOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-exec python3 "$ELIOT_DIR/main.py" "$@"
+if [ -x "$ELIOT_DIR/.venv/bin/python" ]; then
+    ELIOT_PYTHON="$ELIOT_DIR/.venv/bin/python"
+else
+    ELIOT_PYTHON=python3
+fi
+if [ "$#" -eq 0 ]; then set -- serve; fi
+exec "$ELIOT_PYTHON" "$ELIOT_DIR/main.py" "$@"

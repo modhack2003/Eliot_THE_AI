@@ -7,41 +7,82 @@ Connect an OpenAI-compatible Chat Completions endpoint, select its exact model I
 and use your own API key. Local model servers can run without authentication.
 Conversations and run history are stored in SQLite on your machine.
 
-Version **2.0.0a1** is the first working remaster milestone. It provides chat,
-provider configuration, persistence and cancellation. The original security-tool
-integrations remain in the source tree for migration; this release's chat does
-not execute shell commands or run autonomous penetration tests.
+Version **2.0.0a5** improves mission checkpoint recovery and browser reconnection,
+and opens bundled skill references inside the animated workspace. It builds on one-command
+installation and the durable cybersecurity agent core: coordinator/worker
+tasks, typed evidence tools, scoped observations, checkpoints, completion review,
+uploaded personas and 83 default skill modules. Ordinary conversation remains
+separate from task execution. The original broad security-tool integrations
+remain in the source tree for migration.
+
+See [the agent core guide](docs/AGENT_CORE.md) for long-running tasks and
+[third-party notices](THIRD_PARTY_NOTICES.md) for the bundled skill provenance.
+
+```sh
+eliot tasks create "Review the supplied cybersecurity evidence and delegate independent checks" --workspace /path/to/engagement --max-workers 3
+eliot tasks watch TASK_ID
+```
 
 ## Install and start
 
-Requires Python **3.11 or newer**. Run these commands in the extracted repository.
+Download/extract this repository, then run one command in its folder.
+Kali Linux, Debian 12+ and Ubuntu 24.04+:
 
-Linux / Kali:
-
-```sh
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -e .
-python main.py serve
+```bash
+bash install.sh
 ```
 
-Windows PowerShell:
+The installer brings Python, venv/pip, Git, curl, CA certificates and nmap,
+installs Eliot and its Python dependencies in an isolated environment, includes
+all **83 bundled skills**, verifies the installation and creates an **Eliot**
+application-menu shortcut. It requests sudo only for missing OS packages. Run
+as your normal user; no global pip installation is used. Internet access is
+required for the first installation.
+
+Open **Eliot** from the application menu, or start its installed launcher:
+
+```bash
+~/.local/bin/eliot
+```
+
+Windows: double-click **install.cmd**, or use PowerShell:
 
 ```powershell
-py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e .
-.\.venv\Scripts\python.exe main.py serve
+.\install.ps1
+& "$env:LOCALAPPDATA\Eliot\bin\eliot.cmd"
 ```
 
-Open **http://127.0.0.1:8765**. If that port is occupied, use `python main.py serve --port 8876`.
-After installation, the `eliot` command is equivalent to `python main.py`.
+Windows setup installs Python through winget when needed, then installs the same
+app and skills. Automatic provisioning of security tools targets Kali/Linux;
+on Windows, nmap is detected if already installed and otherwise reported missing.
+See [the installation guide](docs/INSTALLATION.md) for custom locations,
+troubleshooting, upgrades and the standalone Linux bootstrap command.
+
+Open **http://127.0.0.1:8765**, then connect your endpoint, exact model ID and API
+key. No model/key is bundled or purchased by installation. The installed launcher
+starts the web/backend when given no arguments; pass `chat` to use its terminal
+client while the backend is running. Add the printed launcher directory to PATH
+for the short `eliot` command. If the port is occupied, use `eliot serve --port 8876`.
 The backend binds to loopback and accepts local clients only. Keep one backend
 process per configuration/database. This alpha does not support remote hosting
 or multiple server workers.
 
+## The intelligence workspace
+
+- **Command:** conversation, model/persona selection and an animated neural core.
+- **Missions:** launch an investigation, follow workers and recorded decisions,
+  add feedback, pause, resume or cancel. Tasks continue while the backend runs.
+- **Skills & personas:** search 83 bundled modules, read their pinned guidance,
+  and import or edit your own text persona.
+- **Connections:** configure and test your compatible API profiles.
+
+Motion can be paused and follows your reduced-motion preference by default.
+The activity indicators reflect recorded backend state. See the
+[workspace guide](docs/WORKSPACE.md) for the full workflow.
+
 ## Connect a model
 
-Start without any configuration file and choose **Connect your first provider**.
+Start without any configuration file and choose **Connect your first model**.
 Enter a name, API base URL (including the provider's version prefix if required),
 and the exact model ID from your provider. Eliot appends `/chat/completions`.
 
@@ -77,8 +118,9 @@ bounded and apply only to rate-limit and selected server-error responses; Eliot
 does not silently forward a failed request to another provider.
 
 Compatibility is with the **Chat Completions protocol**, not every feature of
-every model. Tools, images, custom authentication headers and the Responses API
-are not implemented in this alpha. Use a text chat model and the provider's exact
+every model. Native function calling, images, custom authentication headers and
+the Responses API are not implemented in this alpha. Agent tasks use validated
+JSON decisions with registered application tools instead. Use a text chat model and the provider's exact
 parameter names. Optional `/models` discovery is not required.
 
 ## Use the terminal and browser together
@@ -125,7 +167,10 @@ key; it cannot unset the environment variable of a running process.
 
 See [config.example.yaml](config.example.yaml) for the versioned schema.
 Configuration is saved atomically. Relative database paths are resolved against
-the configuration directory. Defaults are `config.yaml` and `data/eliot.db`.
+the configuration directory. The installer uses `~/.config/eliot/config.yaml`
+and `~/.local/share/eliot/eliot.db` on Linux (respecting XDG), and
+`%LOCALAPPDATA%\Eliot` on Windows. Running directly from source defaults to
+`config.yaml` and `data/eliot.db` in the source workspace.
 `ELIOT_CONFIG` selects another config file; `CONFIG_FILE` is a fallback for older
 deployment environments. A command-line `--config` takes precedence.
 
@@ -157,22 +202,34 @@ python main.py doctor
 python -m pip wheel --no-deps .
 ```
 
-Tests use isolated temporary databases, fake transports and selected legacy
-definitions; they do not call real providers or run security tools. CI is
-configured for Python 3.11/3.13 on Linux and Windows. A workflow being configured
-does not mean it has run remotely.
+Unit tests use isolated temporary databases, fake transports and selected legacy
+definitions. Installation CI additionally provisions Ubuntu prerequisites,
+installs into a path containing spaces, checks the launcher and real web/task
+APIs outside the source tree, and verifies reinstall preservation. It runs a
+Windows install too. No provider requests or assessment scans are needed.
 
-Code is organized under `eliot_app/`: configuration, provider gateway, storage,
-run service, HTTP API, terminal client and browser assets. `main.py` is a small
-entrypoint. The wheel includes the web assets and the supported remaster package.
+```text
+eliot_app/          Supported app, agent runtime, tools, browser assets and skills
+scripts/           Shared installer and installed-app smoke verification
+docs/              Installation and agent-core guides
+tests/             Supported app and legacy regression checks
+legacy/            Historical prototype, tools, scripts and old documentation
+install.sh         Kali/Debian/Ubuntu prerequisite bootstrap
+install.cmd/.ps1   Windows convenience setup
+main.py            Source-development entrypoint
+```
+
+The installed app has no dependency on this source folder. The wheel contains
+only the supported package, browser assets and skill bundle. The source archive
+also includes the installers and preserved historical code.
 
 ## Migration status
 
 The remaster replaces the default launcher; the original main implementation
-is retained as `legacy_main.py`. Its heavyweight dependencies are separated in
-`requirements-legacy.txt`. `agent/`, `mcp_client.py` and historical installation
-scripts remain for reference and future migration. They are not part of the new
-shared chat backend, and the old installers are not the supported setup path.
+is retained under `legacy/`, including its heavyweight requirements, `agent/`,
+old entrypoints, MCP client, deployment scripts and historical docs. They are
+not installed or executed by the new setup. Old root installation names forward
+to `install.sh`; archived scripts under `legacy/scripts/` are reference only.
 
 The working source no longer embeds the exposed MongoDB credential. The old
 credential must still be revoked by its owner: source edits do not invalidate it
@@ -185,6 +242,7 @@ The legacy workflow persistence stubs, automatic vulnerability labels, generated
 code contract, external-session handling and historical packaging still need
 migration and validation. This release does not claim those features are fixed.
 
-Next milestones: validated tool registry and evidence records, reliable transport
-adapters, scoped jobs, verified findings, bounded workflows, and Linux installation
-validation. Keep the original attribution and license when redistributing.
+Next milestones: broader Kali tool adapters, stronger workflow-specific finding
+validators, isolated worker environments, broader Linux tool integration
+validation and voice interaction. Keep the original attribution and third-party notices
+when redistributing.

@@ -230,38 +230,38 @@ pyinstaller --clean "$SPEC_FILE"
 # Check if build was successful
 if [ -f "$DIST_DIR/$BINARY_NAME" ] && [ -f "$DIST_DIR/$INTERACTIVE_BINARY_NAME" ]; then
     echo -e "${GREEN}ELIOT build successful!${NC}"
-    
+
     # Get file sizes
     SIZE_AUTO=$(du -h "$DIST_DIR/$BINARY_NAME" | cut -f1)
     SIZE_INTERACTIVE=$(du -h "$DIST_DIR/$INTERACTIVE_BINARY_NAME" | cut -f1)
-    
+
     echo -e "${BLUE}Generated ELIOT binaries:${NC}"
     echo -e "  Autonomous:   ${GREEN}$DIST_DIR/$BINARY_NAME${NC} (${SIZE_AUTO})"
     echo -e "  Interactive:  ${GREEN}$DIST_DIR/$INTERACTIVE_BINARY_NAME${NC} (${SIZE_INTERACTIVE})"
-    
+
     # Test the binaries
     echo -e "${YELLOW}Testing ELIOT binaries...${NC}"
-    
+
     # Test autonomous binary (help command)
     if timeout 10 "$DIST_DIR/$BINARY_NAME" --help > /dev/null 2>&1; then
         echo -e "  ${GREEN}✓${NC} ELIOT autonomous binary works"
     else
         echo -e "  ${RED}✗${NC} ELIOT autonomous binary failed"
     fi
-    
+
     # Test interactive binary (help command)
     if echo "help" | timeout 5 "$DIST_DIR/$INTERACTIVE_BINARY_NAME" > /dev/null 2>&1; then
         echo -e "  ${GREEN}✓${NC} ELIOT interactive binary works"
     else
         echo -e "  ${RED}✗${NC} ELIOT interactive binary failed"
     fi
-    
+
     # Create installation package
     echo -e "${YELLOW}Creating ELIOT installation package...${NC}"
     mkdir -p "$PACKAGE_NAME"
     cp "$DIST_DIR/$BINARY_NAME" "$PACKAGE_NAME/"
     cp "$DIST_DIR/$INTERACTIVE_BINARY_NAME" "$PACKAGE_NAME/"
-    
+
     # Create installation script for ELIOT
     cat > "$PACKAGE_NAME/install.sh" << 'EOF'
 #!/bin/bash
@@ -315,7 +315,7 @@ llm:
   providers:
     - name: gemini
       model: gemini-2.5-pro
-      api_keys: 
+      api_keys:
         - "YOUR_GEMINI_API_KEY_1"
         - "YOUR_GEMINI_API_KEY_2"
       max_tokens: 4000
@@ -491,7 +491,7 @@ echo -e "${PURPLE}ELIOT - Hacker Assistant by Bikram@2003${NC}"
 EOF
 
     chmod +x "$PACKAGE_NAME/install.sh"
-    
+
     # Create README for ELIOT
     cat > "$PACKAGE_NAME/README.md" << 'EOF'
 # ELIOT - Hacker Assistant by Bikram@2003
@@ -648,11 +648,11 @@ echo -e "${GREEN}ELIOT uninstalled successfully!${NC}"
 EOF
 
     chmod +x "$PACKAGE_NAME/uninstall.sh"
-    
+
     # Create tarball
     echo -e "${YELLOW}Creating ELIOT distribution package...${NC}"
     tar -czf "${PACKAGE_NAME}-linux.tar.gz" "$PACKAGE_NAME/"
-    
+
     echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  ELIOT BUILD COMPLETE!${NC}"
     echo -e "${GREEN}========================================${NC}"
@@ -668,7 +668,7 @@ echo -e "${GREEN}  ELIOT BUILD COMPLETE!${NC}"
     echo -e "  3. Run:     ${GREEN}eliot-interactive${NC}"
     echo ""
     echo -e "${PURPLE}ELIOT - Hacker Assistant by Bikram@2003${NC}"
-    
+
 else
     echo -e "${RED}ELIOT build failed!${NC}"
     echo -e "${RED}Check the output above for errors${NC}"

@@ -1,0 +1,48 @@
+name: Installation
+on: [push, pull_request]
+jobs:
+  linux-install:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: |
+          for script in install.sh install_eliot.sh deploy_eliot_kali.sh production_deploy.sh start_eliot.sh; do
+            bash -n "$script"
+          done
+      - name: Install prerequisites and Eliot
+        run: bash install.sh --prefix "$RUNNER_TEMP/eliot install" --no-desktop
+      - name: Verify installed launcher and nmap
+        run: |
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/eliot install/bin/eliot" --version
+          "$RUNNER_TEMP/eliot install/bin/eliot" doctor --strict --require-nmap
+          nmap --version
+      - name: Verify running web and task APIs outside source
+        run: python3 scripts/verify_installation.py "$RUNNER_TEMP/eliot install"
+      - name: Reinstall without losing configuration or data
+        run: |
+          cp "$RUNNER_TEMP/eliot install/config/config.yaml" "$RUNNER_TEMP/config-before.yaml"
+          sha256sum "$RUNNER_TEMP/eliot install/data/eliot.db" > "$RUNNER_TEMP/database-before.sha256"
+          bash install.sh --prefix "$RUNNER_TEMP/eliot install" --no-desktop
+          cmp "$RUNNER_TEMP/config-before.yaml" "$RUNNER_TEMP/eliot install/config/config.yaml"
+          sha256sum --check "$RUNNER_TEMP/database-before.sha256"
+          "$RUNNER_TEMP/eliot install/bin/eliot" doctor --strict --require-nmap
+  windows-install:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: One-click installer with existing Python
+        shell: pwsh
+        run: ./install.ps1 -Prefix "$env:RUNNER_TEMP\eliot install" -NoDesktop
+      - name: Verify installed launcher
+        shell: pwsh
+        run: |
+          Set-Location $env:RUNNER_TEMP
+          & "$env:RUNNER_TEMP\eliot install\bin\eliot.cmd" --version
+          & "$env:RUNNER_TEMP\eliot install\bin\eliot.cmd" doctor --strict
+      - name: Verify running web and task APIs outside source
+        run: python scripts/verify_installation.py "${{ runner.temp }}\eliot install"

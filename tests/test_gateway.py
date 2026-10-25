@@ -56,7 +56,7 @@ async def test_streaming_normalization():
     assert result.text == "Hello world" and result.usage["total_tokens"] == 8
 
 
-@pytest.mark.parametrize("status,kind", [(401,"invalid_key"),(403,"forbidden"),(404,"not_found"),(429,"rate_limited"),(500,"provider_error"),(302,"provider_error")])
+@pytest.mark.parametrize("status,kind", [(400,"invalid_request"),(401,"invalid_key"),(403,"forbidden"),(404,"not_found"),(413,"request_limit"),(422,"invalid_request"),(429,"rate_limited"),(500,"provider_error"),(302,"redirect_rejected")])
 async def test_error_classification_and_redaction(status, kind):
     gateway = Gateway(httpx.MockTransport(lambda request: httpx.Response(status, json={"error": "secret-do-not-echo"})))
     with pytest.raises(ProviderError) as caught:

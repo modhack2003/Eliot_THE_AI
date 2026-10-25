@@ -101,7 +101,7 @@ def test_sessions_and_context_survive_backend_restart(tmp_path):
         assert client.get("/api/sessions").json()[0]["id"] == session["id"]
         run = client.post(f'/api/sessions/{session["id"]}/runs', json={"content":"What was it?"}).json()
         client.get(f'/api/runs/{run["id"]}/events')
-        assert [m["content"] for m in payloads[-1]["messages"]][1:] == ["Remember my first question", "Saved answer", "What was it?"]
+        assert [m["content"] for m in payloads[-1]["messages"]][2:] == ["Remember my first question", "Saved answer", "What was it?"]
 
 
 def test_api_cancellation_and_conflicting_sends(tmp_path):
@@ -121,3 +121,55 @@ def test_api_cancellation_and_conflicting_sends(tmp_path):
         assert client.delete(f'/api/sessions/{session["id"]}').status_code == 409
         assert client.put("/api/providers/test", json=profile_data()).status_code == 409
         assert client.post(f'/api/runs/{run["id"]}/cancel').json()["status"] == "cancelled"
+
+
+def test_skill_reader_pages_and_invalid_requests(workspace):
+    from eliot_app.instructions import SkillCatalog
+    client, _, requests, _ = workspace
+    catalog = SkillCatalog()
+    skill_id = "triage-validation"
+    first = client.get(f"/api/skills/{skill_id}")
+    assert first.status_code == 200
+    assert first.json() == catalog.read(skill_id)
+    start = first.json()["end_line"] + 1
+    second = client.get(f"/api/skills/{skill_id}?start_line={start}")
+    assert second.json() == catalog.read(skill_id, start_line=start)
+    assert second.json()["sha256"] == first.json()["sha256"]
+    assert client.get(f"/api/skills/{skill_id}?start_line=0").status_code == 400
+    assert client.get("/api/skills/missing").status_code == 400
+    assert client.get(f"/api/skills/{skill_id}?start_line=bad").status_code == 422
+    assert requests == []
+
+
+def test_all_workspace_assets_are_served(workspace):
+    client, _, _, _ = workspace
+    html = client.get("/").text
+    for asset in ("style.css", "app.js", "workspace.js", "neural.js", "transport.js"):
+        assert f"/static/{asset}" in html
+        response = client.get(f"/static/{asset}")
+        assert response.status_code == 200 and len(response.content) > 100
+
+
+def test_token_refresh_signal_is_distinct_from_origin_denial(workspace):
+    client, _, _, _ = workspace
+    expired = client.post("/api/sessions", json={}, headers={"X-Eliot-Token": "stale"})
+    assert expired.status_code == 403
+    assert expired.json()["code"] == "invalid_request_token"
+    denied = client.post("/api/sessions", json={}, headers={"Origin": "https://attacker.example", "X-Eliot-Token": "stale"})
+    assert denied.status_code == 403
+    assert denied.json().get("code") != "invalid_request_token"
+    assert client.get("/api/sessions").json() == []
+
+
+def test_skill_reference_reader_enforces_pinned_paths(workspace):
+    from eliot_app.instructions import SkillCatalog
+    client, _, requests, _ = workspace
+    path = "/api/skills/offensive-osint"
+    resource = "references/recon-stack.md"
+    page = client.get(path, params={"resource": resource})
+    assert page.status_code == 200
+    assert page.json() == SkillCatalog().read("offensive-osint", resource=resource)
+    assert resource in page.json()["resources"]
+    for resource in ("../../manifest.json", "../triage-validation/SKILL.md", "missing.md", "/etc/passwd"):
+        assert client.get(path, params={"resource": resource}).status_code == 400
+    assert requests == []

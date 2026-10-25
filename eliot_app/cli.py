@@ -5,6 +5,8 @@ import argparse
 from getpass import getpass
 import json
 import sys
+import time
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
@@ -23,13 +25,44 @@ def main():
     commands = parser.add_subparsers(dest="command")
     serve = commands.add_parser("serve", help="Start the local backend and web interface")
     serve.add_argument("--port", type=int, default=8765)
-    commands.add_parser("doctor", help="Validate configuration without making provider requests")
+    doctor = commands.add_parser("doctor", help="Check dependencies, storage, web assets and skill integrity offline")
+    doctor.add_argument("--json", action="store_true", help="Machine-readable readiness report")
+    doctor.add_argument("--strict", action="store_true", help="Exit unsuccessfully if a required check fails")
+    doctor.add_argument("--require-nmap", action="store_true", help="Treat missing nmap as an error")
     chat = commands.add_parser("chat", help="Chat using the running backend")
     chat.add_argument("--session", help="Resume a saved session")
     chat.add_argument("--provider", help="Provider profile ID")
+    chat.add_argument("--persona", default="eliot", help="Persona profile ID")
     commands.add_parser("sessions", help="List saved sessions")
     export = commands.add_parser("export", help="Export a session as JSON to stdout")
     export.add_argument("session_id")
+    commands.add_parser("skills", help="List the bundled cybersecurity skills")
+    persona = commands.add_parser("personas", help="List or import a subordinate text persona")
+    persona.add_argument("--import-file")
+    persona.add_argument("--id")
+    persona.add_argument("--name")
+    tasks = commands.add_parser("tasks", help="Create and manage durable cybersecurity tasks")
+    task_actions = tasks.add_subparsers(dest="action")
+    create = task_actions.add_parser("create")
+    create.add_argument("objective")
+    create.add_argument("--workspace", required=True)
+    create.add_argument("--provider")
+    create.add_argument("--persona", default="eliot")
+    create.add_argument("--skill", action="append")
+    create.add_argument("--target", action="append", default=[])
+    create.add_argument("--network", action="store_true")
+    create.add_argument("--max-steps", type=int, default=0)
+    create.add_argument("--token-budget", type=int, default=0)
+    create.add_argument("--max-workers", type=int, default=3)
+    for action in ["show", "watch", "pause", "resume", "cancel", "feedback"]:
+        item = task_actions.add_parser(action)
+        item.add_argument("id")
+        if action == "feedback":
+            item.add_argument("text")
+        if action == "resume":
+            item.add_argument("--max-steps", type=int)
+            item.add_argument("--token-budget", type=int)
+    task_actions.add_parser("list")
     providers = commands.add_parser("providers", help="Manage providers through the running backend")
     actions = providers.add_subparsers(dest="action")
     actions.add_parser("list")
@@ -57,10 +90,17 @@ def main():
             uvicorn.run(create_app(args.config), host="127.0.0.1", port=args.port, access_log=False)
             return
         if args.command == "doctor":
-            settings = Settings(args.config)
-            print(f"Eliot {__version__}\nConfig: {settings.path}\nSession database: {settings.database_path}")
-            print(f"Providers: {len(settings.providers)}; default: {settings.default_provider or 'not set'}")
-            print("No API calls were made. Start with: eliot serve")
+            from .diagnostics import diagnose
+            report = diagnose(args.config, require_nmap=args.require_nmap)
+            if args.json:
+                print(json.dumps(report, indent=2, ensure_ascii=False))
+            else:
+                print(f"Eliot {__version__} — installation checks")
+                for check in report["checks"]:
+                    print(f'{check["status"].upper():7} {check["name"]}: {check["detail"]}')
+                print("No API calls or scans were made. Start with: eliot serve")
+            if args.strict and not report["ready"]:
+                raise SystemExit(1)
             return
         url = urlsplit(args.server)
         if url.scheme != "http" or not url.hostname or not loopback(url.hostname) or url.username or url.password or url.query or url.fragment:
@@ -77,6 +117,24 @@ def main():
                 provider_commands(client, args)
             elif args.command == "chat":
                 chat_loop(client, args)
+            elif args.command == "skills":
+                for skill in request(client, "GET", "/api/skills"):
+                    print(skill["id"] + ": " + skill["description"][:180])
+            elif args.command == "personas":
+                if args.import_file:
+                    if not args.id or not args.name:
+                        raise ValueError("Persona import requires --id and --name.")
+                    path = Path(args.import_file)
+                    if path.stat().st_size > 48_000:
+                        raise ValueError("Persona file is too large.")
+                    text = path.read_text(encoding="utf-8")
+                    request(client, "PUT", f"/api/personas/{args.id}", json={"name": args.name, "instructions": text})
+                    print("Persona imported below the fixed system rules.")
+                else:
+                    for item in request(client, "GET", "/api/personas"):
+                        print(item["id"] + ": " + item["name"])
+            elif args.command == "tasks":
+                task_commands(client, args)
     except (ConfigError, ValueError, httpx.HTTPError, OSError) as error:
         if isinstance(error, httpx.HTTPError):
             print("Cannot connect to Eliot. Start the backend with: eliot serve", file=sys.stderr)
@@ -118,6 +176,44 @@ def provider_commands(client, args):
         print("Connection test passed." if action == "test" else "Default provider saved.")
 
 
+def task_commands(client, args):
+    action = args.action or "list"
+    if action == "create":
+        payload = dict(objective=args.objective, workspace=str(Path(args.workspace).resolve()), provider_id=args.provider, persona_id=args.persona, skills=args.skill, targets=args.target, network=args.network, max_steps=args.max_steps, token_budget=args.token_budget, max_workers=args.max_workers)
+        result = request(client, "POST", "/api/tasks", json=payload)
+        print("Task started: " + result["id"])
+        print("The backend owns this task; disconnecting the terminal does not stop it.")
+    elif action == "list":
+        for item in request(client, "GET", "/api/tasks"):
+            print(f'{item["id"]}  {item["status"]}  {item["objective"][:90]}')
+    elif action == "show":
+        print(json.dumps(request(client, "GET", f"/api/tasks/{args.id}"), indent=2, ensure_ascii=False))
+    elif action == "feedback":
+        request(client, "POST", f"/api/tasks/{args.id}/feedback", json={"text": args.text})
+        print("Feedback recorded for the next planning turn. Resume explicitly if the task is blocked or paused.")
+    elif action == "watch":
+        after = 0
+        try:
+            while True:
+                events = request(client, "GET", f"/api/tasks/{args.id}/events?after={after}")
+                for event in events:
+                    print(f'{event["id"]} {event["kind"]}: {json.dumps(event["data"], ensure_ascii=False)}')
+                    after = event["id"]
+                if len(events) == 100:
+                    continue
+                item = request(client, "GET", f"/api/tasks/{args.id}")
+                if item["status"] in {"completed", "blocked", "cancelled", "paused", "budget_exhausted"}:
+                    print(item["status"] + ": " + (item["result"] or item["reason"]))
+                    return
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\nStopped watching; task continues in the backend.")
+    else:
+        payload = {"max_steps": args.max_steps, "token_budget": args.token_budget} if action == "resume" else None
+        result = request(client, "POST", f"/api/tasks/{args.id}/{action}", json=payload)
+        print(result["status"])
+
+
 def chat_loop(client, args):
     session = request(client, "GET", f"/api/sessions/{args.session}") if args.session else request(client, "POST", "/api/sessions", json={})
     session_id, provider_id = session["id"], args.provider
@@ -143,7 +239,7 @@ def chat_loop(client, args):
             continue
         run = None
         try:
-            run = request(client, "POST", f"/api/sessions/{session_id}/runs", json={"content": text, "provider_id": provider_id})
+            run = request(client, "POST", f"/api/sessions/{session_id}/runs", json={"content": text, "provider_id": provider_id, "persona_id": args.persona})
             print("\nEliot > ", end="", flush=True)
             length = 0
             with client.stream("GET", f'/api/runs/{run["id"]}/events') as response:

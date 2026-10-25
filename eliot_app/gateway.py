@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 import json
+import math
 import os
 
 import httpx
@@ -15,8 +16,9 @@ from .config import Provider
 
 
 class ProviderError(Exception):
-    def __init__(self, kind: str, message: str):
+    def __init__(self, kind: str, message: str, retry_after=None):
         self.kind = kind
+        self.retry_after = retry_after
         super().__init__(message)
 
 
@@ -35,7 +37,7 @@ def retry_delay(header: str | None, attempt: int) -> float:
             delay = (parsedate_to_datetime(header) - datetime.now(timezone.utc)).total_seconds()
         except (ValueError, TypeError, OverflowError):
             delay = 2 ** attempt
-    return max(0, delay)
+    return max(0, delay) if math.isfinite(delay) else 2 ** attempt
 
 
 class Gateway:
@@ -68,13 +70,18 @@ class Gateway:
                                     continue
                         if code >= 300:
                             kind, message = {
+                                400: ("invalid_request", "The provider rejected the request. Check model parameters and context limits."),
                                 401: ("invalid_key", "The provider rejected the API key."),
                                 403: ("forbidden", "The provider denied access to this model or account."),
                                 404: ("not_found", "The model or endpoint was not found. Check the base URL and exact model ID."),
                                 429: ("rate_limited", "The provider is rate limited or has exhausted quota. Try again later."),
+                                413: ("request_limit", "The provider rejected the request size. Use a model with a larger context window."),
+                                422: ("invalid_request", "The provider rejected the request format or parameters."),
                             }.get(code, ("provider_error", f"Provider request failed (HTTP {code}). Check endpoint settings and model parameters."))
                             # Provider response bodies can echo credentials; never surface them.
-                            raise ProviderError(kind, message)
+                            if 300 <= code < 400:
+                                kind = "redirect_rejected"
+                            raise ProviderError(kind, message, retry_delay(response.headers.get("retry-after"), attempt) if code in {429, 503} else None)
                         if not provider.streaming:
                             payload = bytearray()
                             async for chunk in response.aiter_bytes():
