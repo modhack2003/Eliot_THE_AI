@@ -121,3 +121,30 @@ def test_api_cancellation_and_conflicting_sends(tmp_path):
         assert client.delete(f'/api/sessions/{session["id"]}').status_code == 409
         assert client.put("/api/providers/test", json=profile_data()).status_code == 409
         assert client.post(f'/api/runs/{run["id"]}/cancel').json()["status"] == "cancelled"
+
+
+def test_skill_reader_pages_and_invalid_requests(workspace):
+    from eliot_app.instructions import SkillCatalog
+    client, _, requests, _ = workspace
+    catalog = SkillCatalog()
+    skill_id = "triage-validation"
+    first = client.get(f"/api/skills/{skill_id}")
+    assert first.status_code == 200
+    assert first.json() == catalog.read(skill_id)
+    start = first.json()["end_line"] + 1
+    second = client.get(f"/api/skills/{skill_id}?start_line={start}")
+    assert second.json() == catalog.read(skill_id, start_line=start)
+    assert second.json()["sha256"] == first.json()["sha256"]
+    assert client.get(f"/api/skills/{skill_id}?start_line=0").status_code == 400
+    assert client.get("/api/skills/missing").status_code == 400
+    assert client.get(f"/api/skills/{skill_id}?start_line=bad").status_code == 422
+    assert requests == []
+
+
+def test_all_workspace_assets_are_served(workspace):
+    client, _, _, _ = workspace
+    html = client.get("/").text
+    for asset in ("style.css", "app.js", "workspace.js", "neural.js"):
+        assert f"/static/{asset}" in html
+        response = client.get(f"/static/{asset}")
+        assert response.status_code == 200 and len(response.content) > 100

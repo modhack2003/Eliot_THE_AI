@@ -1,54 +1,977 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Eliot — your local workspace for AI conversations, any compatible provider, and lasting context.">
-  <title>Eliot · Workspace</title>
-  <link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script>
-</head>
-<body>
-  <aside class="sidebar">
-    <a class="brand" href="/" aria-label="Eliot home"><span class="brand-mark">e.</span><span>eliot<span class="brand-caption">REMASTERED</span></span></a>
-    <button id="new-chat" class="new-chat"><span>＋</span> New conversation <kbd>N</kbd></button>
-    <div class="nav-label">WORKSPACE</div>
-    <button id="chat-nav" class="nav active"><span>◫</span> Conversations <span id="session-count" class="count">0</span></button>
-    <button id="providers-nav" class="nav"><span>⌘</span> Providers <span id="provider-count" class="count">0</span></button>
-    <div class="history-heading"><span class="nav-label">RECENT CONVERSATIONS</span><button id="refresh" class="icon-button" aria-label="Refresh conversations">↻</button></div>
-    <div id="sessions" class="session-list"></div>
-    <div class="sidebar-footer"><span class="status-dot"></span><div>Local workspace<small id="version">Eliot 2.0</small></div><span class="footer-symbol">↗</span></div>
-  </aside>
-  <main>
-    <header class="topbar"><div class="breadcrumb"><button id="menu-toggle" class="icon-button mobile-menu" aria-label="Toggle workspace menu" aria-expanded="false">☰</button>Workspace <span>/</span> <strong id="page-label">Conversations</strong></div><div class="topbar-right"><span class="local-label"><i class="status-dot"></i> On your machine</span><button id="settings-link" class="icon-button" aria-label="Open provider settings">⚙</button></div></header>
-    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
-    <section id="chat-view" class="chat-view">
-      <div class="conversation-toolbar"><div class="model-control"><span class="mini-mark">✳</span><label class="sr-only" for="provider-select">Active provider</label><select id="provider-select"><option value="">Connect a provider</option></select><span id="model-name" class="model-name"></span></div><div class="conversation-actions"><a id="export-session" class="text-button" hidden>↓ Export</a><button id="delete-session" class="text-button" hidden>Delete</button></div></div>
-      <div id="conversation" class="conversation" aria-live="polite">
-        <div id="welcome" class="welcome">
-          <div class="eyebrow"><span></span> A NEW CHAPTER FOR ELIOT</div>
-          <h1>Less friction.<br><em>More possibility.</em></h1>
-          <p>Your models. Your conversations. One workspace.<br>Choose a provider and pick up where your ideas left off.</p>
-          <button id="connect-provider" class="connect-button">Connect your first provider <span>↗</span></button>
-          <div class="suggestions"><button data-prompt="Help me review a software project. What code and context should I share first?"><span>01 / REVIEW</span><strong>Understand a codebase</strong><small>Trace the structure. Find what matters. ↗</small></button><button data-prompt="Help me debug a problem. Ask me for the symptoms and relevant logs before suggesting a fix."><span>02 / RESOLVE</span><strong>Work through a problem</strong><small>Turn a rough edge into a next step. ↗</small></button><button data-prompt="Help me make a practical implementation plan with clear milestones and verification steps."><span>03 / BUILD</span><strong>Shape the next version</strong><small>From an idea to a practical plan. ↗</small></button></div>
-        </div>
-        <div id="messages" class="messages"></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#090d13" />
+    <meta
+      name="description"
+      content="Eliot — your local cybersecurity intelligence workspace."
+    />
+    <title>Eliot · Intelligence workspace</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="/static/app.js" defer></script>
+    <script src="/static/workspace.js" defer></script>
+    <script src="/static/neural.js" defer></script>
+  </head>
+  <body data-activity="idle">
+    <svg
+      class="icon-definitions"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <defs>
+        <symbol id="i-grid" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </symbol>
+        <symbol id="i-orbit" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3" />
+          <ellipse
+            cx="12"
+            cy="12"
+            rx="11"
+            ry="5"
+            transform="rotate(-35 12 12)"
+          />
+          <path d="M7 3c4-1 9 5 10 11s-1 8-4 7" />
+        </symbol>
+        <symbol id="i-target" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8" />
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 1v4m0 14v4M1 12h4m14 0h4" />
+        </symbol>
+        <symbol id="i-stack" viewBox="0 0 24 24">
+          <path d="m12 3 10 5-10 5L2 8l10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5" />
+        </symbol>
+        <symbol id="i-plug" viewBox="0 0 24 24">
+          <path d="M9 3v5m6-5v5M6 8h12v4a6 6 0 0 1-12 0V8Zm6 10v4" />
+        </symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24">
+          <path d="M5 12h14m-6-6 6 6-6 6" />
+        </symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" />
+        </symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24">
+          <path d="m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6l8-4Z" />
+          <path d="m8 12 3 3 5-6" />
+        </symbol>
+        <symbol id="i-signal" viewBox="0 0 24 24">
+          <path d="M2 12h4l3-8 5 16 3-8h5" />
+        </symbol>
+        <symbol id="i-search" viewBox="0 0 24 24">
+          <circle cx="10" cy="10" r="6" />
+          <path d="m15 15 6 6" />
+        </symbol>
+        <symbol id="i-menu" viewBox="0 0 24 24">
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </symbol>
+        <symbol id="i-chat" viewBox="0 0 24 24">
+          <path
+            d="M20 15a3 3 0 0 1-3 3H8l-5 3V6a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3v9Z"
+          />
+          <path d="M7 8h9M7 12h6" />
+        </symbol>
+      </defs>
+    </svg>
+    <a class="skip-link" href="#main-content">Skip to workspace</a>
+    <button
+      id="sidebar-backdrop"
+      class="sidebar-backdrop"
+      aria-label="Close navigation"
+      hidden
+    ></button>
+    <aside class="sidebar" aria-label="Workspace navigation">
+      <a class="brand" href="/" aria-label="Eliot home"
+        ><span class="brand-mark"
+          ><svg class="icon"><use href="#i-orbit" /></svg></span
+        ><span
+          >ELIOT<span class="brand-caption">INTELLIGENCE WORKSPACE</span></span
+        ><span class="brand-version">2</span></a
+      >
+      <button id="new-chat" class="new-chat">
+        <svg class="icon"><use href="#i-plus" /></svg> New conversation
+        <kbd>N</kbd>
+      </button>
+      <div class="nav-label">WORKSPACE</div>
+      <nav>
+        <button id="chat-nav" class="nav active" aria-current="page">
+          <svg class="icon"><use href="#i-orbit" /></svg> Command
+          <span id="session-count" class="count">0</span>
+        </button>
+        <button id="missions-nav" class="nav">
+          <svg class="icon"><use href="#i-target" /></svg> Missions
+          <span id="mission-count" class="count">0</span>
+        </button>
+        <button id="library-nav" class="nav">
+          <svg class="icon"><use href="#i-stack" /></svg> Skills & personas
+          <span class="nav-spark">✦</span>
+        </button>
+        <button id="providers-nav" class="nav">
+          <svg class="icon"><use href="#i-plug" /></svg> Connections
+          <span id="provider-count" class="count">0</span>
+        </button>
+      </nav>
+      <div class="history-heading">
+        <span class="nav-label">RECENT CONVERSATIONS</span
+        ><button
+          id="refresh"
+          class="icon-button"
+          aria-label="Refresh conversations"
+        >
+          ↻
+        </button>
       </div>
-      <div class="composer-area"><form id="chat-form" class="composer"><label for="message" class="sr-only">Message Eliot</label><textarea id="message" rows="2" maxlength="16000" placeholder="What are we working on today?"></textarea><div class="composer-bottom"><span id="run-status"><span class="small-dot"></span> Ready when you are</span><div><button id="stop" class="stop-button" type="button" hidden>■ Stop</button><button id="send" class="send-button" type="submit" aria-label="Send message">↑</button></div></div></form><p class="composer-note">Conversations stay on this machine. Messages are sent to your selected model provider.</p></div>
-    </section>
-    <section id="providers-view" class="providers-view" hidden>
-      <div class="eyebrow"><span></span> CONNECT YOUR INTELLIGENCE</div><div class="page-heading"><div><h1>Your models.<br><em>Your choice.</em></h1><p>Bring an OpenAI-compatible API or a local model server.</p></div><button id="add-provider" class="primary-button">＋ Add provider</button></div>
-      <div id="provider-cards" class="provider-cards"></div>
-      <div class="quiet-note"><span>↳</span><p>Use an exact model ID and the API's base address, usually ending in <code>/v1</code>. Connection tests send a short request to your provider. Streaming can be turned off for providers that only support standard responses.</p></div>
-    </section>
-  </main>
-  <dialog id="provider-dialog"><form id="provider-form"><div class="dialog-heading"><div><div class="eyebrow">PROVIDER PROFILE</div><h2 id="dialog-title">Make a connection.</h2></div><button type="button" id="close-dialog" class="icon-button" aria-label="Close provider settings">×</button></div>
-    <div class="form-row"><label>Display name<input id="p-name" required maxlength="120" placeholder="My model provider"></label><label>Profile ID<input id="p-id" required pattern="[a-zA-Z0-9_-]{1,64}" maxlength="64" placeholder="primary"></label></div>
-    <label>API base URL<input id="p-url" type="url" required placeholder="https://api.example.com/v1"></label>
-    <label>Model ID<input id="p-model" required maxlength="200" placeholder="Exact model ID from your provider"></label>
-    <div class="form-row"><label>Authentication<select id="p-auth"><option value="bearer">API key</option><option value="none">No key (local server)</option></select></label><label>Key environment variable<input id="p-env" value="ELIOT_API_KEY" required pattern="[A-Za-z_][A-Za-z0-9_]*"></label></div>
-    <label>Temporary API key <span class="optional">optional</span><input id="p-key" type="password" autocomplete="new-password" maxlength="4096" placeholder="Set a key for this backend session"></label><p class="field-note">Temporary keys stay in backend memory until it exits. To keep a key across restarts, set the environment variable before starting Eliot.</p>
-    <label class="checkbox-label"><input id="p-stream" type="checkbox" checked> Stream responses as they arrive</label>
-    <details><summary>Advanced model settings</summary><div class="form-row"><label>Timeout (seconds)<input id="p-timeout" type="number" min="1" max="300" value="60" required></label><label>Server-error retries<input id="p-retries" type="number" min="0" max="2" value="1" required></label></div><label>Generation parameters (JSON)<textarea id="p-parameters" rows="3" spellcheck="false">{}</textarea></label><p class="field-note">Leave empty for compatibility. Add only parameters supported by your model, such as max_tokens or max_completion_tokens.</p></details>
-    <div id="form-error" class="form-error" role="alert" hidden></div><div class="dialog-footer"><button type="button" id="cancel-dialog" class="secondary-button">Cancel</button><button type="submit" id="save-provider" class="primary-button">Save provider ↗</button></div>
-  </form></dialog>
-</body>
+      <div id="sessions" class="session-list"></div>
+      <div class="sidebar-bottom">
+        <div class="private-note">
+          <svg class="icon"><use href="#i-shield" /></svg
+          ><span>Your workspace.<br /><strong>On your machine.</strong></span>
+        </div>
+        <div class="sidebar-footer">
+          <span class="operator-avatar">OP</span>
+          <div>Operator<small id="version">Connecting…</small></div>
+          <span class="status-dot"></span>
+        </div>
+      </div>
+    </aside>
+    <main id="main-content">
+      <header class="topbar">
+        <div class="breadcrumb">
+          <button
+            id="menu-toggle"
+            class="icon-button mobile-menu"
+            aria-label="Toggle workspace menu"
+            aria-expanded="false"
+          >
+            <svg class="icon"><use href="#i-menu" /></svg></button
+          ><span class="breadcrumb-home">Workspace</span><span>/</span
+          ><strong id="page-label">Command</strong>
+        </div>
+        <div class="topbar-right">
+          <span id="connection-indicator" class="connection-indicator"
+            ><i class="status-dot"></i
+            ><span id="connection-label">Connecting</span></span
+          ><button
+            id="motion-toggle"
+            class="text-button"
+            aria-pressed="false"
+            title="Pause decorative animation"
+          >
+            Pause motion</button
+          ><button
+            id="settings-link"
+            class="icon-button"
+            aria-label="Open connections"
+          >
+            <svg class="icon"><use href="#i-plug" /></svg>
+          </button>
+        </div>
+      </header>
+      <div
+        id="notice"
+        class="notice"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></div>
+      <div class="workspace-grid">
+        <div class="primary-workspace">
+          <section id="chat-view" class="chat-view" aria-label="Conversation">
+            <div class="conversation-toolbar">
+              <div class="model-control">
+                <span class="provider-light"></span
+                ><label class="sr-only" for="provider-select"
+                  >Active provider</label
+                ><select id="provider-select">
+                  <option value="">Connect a provider</option></select
+                ><span id="model-name" class="model-name"></span>
+              </div>
+              <div class="conversation-actions">
+                <a id="export-session" class="text-button" hidden>Export ↗</a
+                ><button id="delete-session" class="text-button" hidden>
+                  Delete
+                </button>
+              </div>
+            </div>
+            <div id="conversation" class="conversation">
+              <div id="welcome" class="welcome">
+                <div class="hero-meta">
+                  <span class="eyebrow"
+                    ><i class="tiny-cross">+</i> ELIOT / SECURITY
+                    INTELLIGENCE</span
+                  ><span class="mono muted">SYSTEM 02</span>
+                </div>
+                <div class="hero-stage">
+                  <div class="hero-copy">
+                    <div class="availability">
+                      <span class="status-dot"></span
+                      ><span id="hero-status">Standing by</span>
+                    </div>
+                    <h1>
+                      A curious mind.<br /><span>An unbroken focus.</span>
+                    </h1>
+                    <p>
+                      Your partner in the investigation.<br />Explore the
+                      evidence. Connect the signals.<br />Give the next mission
+                      a place to begin.
+                    </p>
+                    <button id="hero-mission" class="primary-button">
+                      Launch a mission
+                      <svg class="icon"><use href="#i-arrow" /></svg></button
+                    ><button
+                      id="connect-provider"
+                      class="text-button connect-button"
+                    >
+                      Connect your first model ↗
+                    </button>
+                  </div>
+                  <div
+                    class="neural-stage"
+                    aria-label="Animated neural core; decorative visualization of Eliot activity"
+                  >
+                    <div class="core-grid"></div>
+                    <div class="core-halo"></div>
+                    <canvas id="neural-canvas" aria-hidden="true"></canvas>
+                    <div class="core-coordinate coordinate-top">
+                      NEURAL CORE <span>01</span>
+                    </div>
+                    <div class="core-coordinate coordinate-bottom">
+                      <span class="core-live-dot"></span
+                      ><span id="core-state">IDLE · AWAITING INPUT</span>
+                    </div>
+                    <div class="core-tick tick-left"></div>
+                    <div class="core-tick tick-right"></div>
+                  </div>
+                </div>
+                <div class="hero-divider">
+                  <span>WHERE DO WE BEGIN?</span
+                  ><span class="mono">01 — 03</span>
+                </div>
+                <div class="suggestions">
+                  <button
+                    data-prompt="Help me plan an authorized security assessment. Ask me about the target scope, available evidence and desired outcome before proposing checks."
+                  >
+                    <span class="suggestion-icon"
+                      ><svg class="icon"><use href="#i-target" /></svg
+                      ><span>01</span></span
+                    ><strong>Plan an assessment</strong
+                    ><small>Turn your scope into a clear approach.</small
+                    ><span class="suggestion-arrow">↗</span>
+                  </button>
+                  <button
+                    data-prompt="Help me review security evidence. Ask which logs, scan output or artifacts I have and help distinguish observations from verified findings."
+                  >
+                    <span class="suggestion-icon"
+                      ><svg class="icon"><use href="#i-search" /></svg
+                      ><span>02</span></span
+                    ><strong>Follow the evidence</strong
+                    ><small>Find the story inside your artifacts.</small
+                    ><span class="suggestion-arrow">↗</span>
+                  </button>
+                  <button id="explore-skills">
+                    <span class="suggestion-icon"
+                      ><svg class="icon"><use href="#i-stack" /></svg
+                      ><span>03</span></span
+                    ><strong>Expand your approach</strong
+                    ><small>Explore the installed skill library.</small
+                    ><span class="suggestion-arrow">↗</span>
+                  </button>
+                </div>
+              </div>
+              <div
+                id="messages"
+                class="messages"
+                aria-live="polite"
+                aria-relevant="additions"
+              ></div>
+            </div>
+            <div class="composer-area">
+              <form id="chat-form" class="composer">
+                <label for="message" class="sr-only">Message Eliot</label
+                ><textarea
+                  id="message"
+                  rows="2"
+                  maxlength="16000"
+                  placeholder="Ask a question. Explore an idea. Start with a signal…"
+                ></textarea>
+                <div class="composer-bottom">
+                  <div class="composer-tools">
+                    <span class="composer-mode"
+                      ><svg class="icon"><use href="#i-chat" /></svg>
+                      Conversation</span
+                    ><label class="sr-only" for="chat-persona"
+                      >Conversation persona</label
+                    ><select
+                      id="chat-persona"
+                      aria-label="Conversation persona"
+                    >
+                      <option value="eliot">Eliot</option>
+                    </select>
+                  </div>
+                  <div class="composer-send">
+                    <span id="run-status">Connect a model to begin</span
+                    ><button id="stop" class="stop-button" type="button" hidden>
+                      ■ Stop</button
+                    ><button
+                      id="send"
+                      class="send-button"
+                      type="submit"
+                      aria-label="Send message"
+                    >
+                      ↑
+                    </button>
+                  </div>
+                </div>
+              </form>
+              <p class="composer-note">
+                <span
+                  >Enter to send <span class="note-divider">·</span> Shift +
+                  Enter for a new line</span
+                ><span
+                  >Local history · Your selected model processes messages</span
+                >
+              </p>
+            </div>
+          </section>
+          <section
+            id="missions-view"
+            class="content-view"
+            aria-label="Missions"
+            hidden
+          >
+            <div class="section-intro">
+              <span class="eyebrow">PERSISTENT OPERATIONS</span>
+              <div class="page-heading">
+                <div>
+                  <h1>Follow every lead.</h1>
+                  <p>
+                    One objective. Independent workers. A shared record of
+                    evidence.
+                  </p>
+                </div>
+                <button id="new-mission" class="primary-button">
+                  + New mission
+                </button>
+              </div>
+            </div>
+            <div class="mission-controls">
+              <label class="search-field"
+                ><svg class="icon"><use href="#i-search" /></svg
+                ><input
+                  id="mission-search"
+                  placeholder="Find a mission…"
+                  aria-label="Search missions" /></label
+              ><label class="sr-only" for="mission-filter"
+                >Filter missions</label
+              ><select id="mission-filter">
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="attention">Needs attention</option>
+                <option value="completed">Completed</option></select
+              ><button
+                id="refresh-missions"
+                class="icon-button"
+                aria-label="Refresh missions"
+              >
+                ↻
+              </button>
+            </div>
+            <div id="mission-list" class="mission-list"></div>
+            <section
+              id="mission-detail"
+              class="mission-detail"
+              hidden
+              aria-label="Selected mission"
+            >
+              <div class="detail-heading">
+                <div>
+                  <span id="task-status" class="badge"></span>
+                  <h2 id="task-objective"></h2>
+                </div>
+                <button
+                  id="close-mission"
+                  class="icon-button"
+                  aria-label="Close mission detail"
+                >
+                  ×
+                </button>
+              </div>
+              <div id="task-meta" class="task-meta"></div>
+              <div id="task-actions" class="task-actions"></div>
+              <p id="task-reason" class="task-reason" hidden></p>
+              <pre id="task-result" class="task-result" hidden></pre>
+              <div class="section-label">AGENT TEAM</div>
+              <div id="task-children" class="worker-list"></div>
+              <div class="section-label">ACTIVITY & EVIDENCE</div>
+              <div id="task-events" class="event-list"></div>
+              <form id="feedback-form" class="feedback-form">
+                <label for="task-feedback">Send direction to this agent</label>
+                <div>
+                  <input
+                    id="task-feedback"
+                    required
+                    maxlength="6000"
+                    placeholder="Add context, evidence or a change in approach…"
+                  /><button class="secondary-button" type="submit">
+                    Send feedback ↗
+                  </button>
+                </div>
+              </form>
+            </section>
+          </section>
+          <section
+            id="library-view"
+            class="content-view"
+            aria-label="Skills and personas"
+            hidden
+          >
+            <div class="section-intro">
+              <span class="eyebrow">KNOWLEDGE & CHARACTER</span>
+              <div class="page-heading">
+                <div>
+                  <h1>Depth, by design.</h1>
+                  <p>
+                    Specialist guidance. A persona that fits your way of
+                    working.
+                  </p>
+                </div>
+                <button id="import-persona" class="secondary-button">
+                  + Import persona
+                </button>
+              </div>
+            </div>
+            <div class="library-tabs" role="tablist" aria-label="Library">
+              <button
+                id="skills-tab"
+                role="tab"
+                aria-selected="true"
+                aria-controls="skills-panel"
+                class="active"
+              >
+                Skill library <span id="skill-count">0</span></button
+              ><button
+                id="personas-tab"
+                role="tab"
+                aria-selected="false"
+                aria-controls="personas-panel"
+                tabindex="-1"
+              >
+                Personas <span id="persona-count">0</span>
+              </button>
+            </div>
+            <div id="skills-panel" role="tabpanel" aria-labelledby="skills-tab">
+              <label class="search-field library-search"
+                ><svg class="icon"><use href="#i-search" /></svg
+                ><input
+                  id="skill-search"
+                  placeholder="Search skills, platforms and techniques…"
+                  aria-label="Search skills"
+              /></label>
+              <p id="skill-results" class="field-note"></p>
+              <div id="skill-list" class="skill-list"></div>
+            </div>
+            <div
+              id="personas-panel"
+              role="tabpanel"
+              aria-labelledby="personas-tab"
+              hidden
+            >
+              <div class="hierarchy-note">
+                <svg class="icon"><use href="#i-shield" /></svg>
+                <p>
+                  <strong>Character with a consistent foundation.</strong
+                  ><br />System rules and task permissions come first, then
+                  persona, then skill guidance.
+                </p>
+              </div>
+              <div id="persona-list" class="provider-cards"></div>
+            </div>
+          </section>
+          <section
+            id="providers-view"
+            class="content-view providers-view"
+            aria-label="Connections"
+            hidden
+          >
+            <div class="section-intro">
+              <span class="eyebrow">BRING YOUR INTELLIGENCE</span>
+              <div class="page-heading">
+                <div>
+                  <h1>
+                    One workspace.<br /><span>Any compatible model.</span>
+                  </h1>
+                  <p>
+                    Connect your API or local model server. Switch when you need
+                    to.
+                  </p>
+                </div>
+                <button id="add-provider" class="primary-button">
+                  + Add connection
+                </button>
+              </div>
+            </div>
+            <div id="provider-cards" class="provider-cards"></div>
+            <div class="quiet-note">
+              <svg class="icon"><use href="#i-plug" /></svg>
+              <p>
+                Use an OpenAI-compatible Chat Completions endpoint and its exact
+                model ID. Connection tests send a short request. Temporary keys
+                stay in memory until the backend exits.
+              </p>
+            </div>
+          </section>
+        </div>
+        <aside class="inspector" aria-label="Workspace status">
+          <div class="inspector-heading">
+            <span class="section-label">SYSTEM OVERVIEW</span
+            ><span class="mono">↗</span>
+          </div>
+          <div class="system-card">
+            <div class="system-card-top">
+              <div class="mini-core">
+                <svg class="icon"><use href="#i-orbit" /></svg>
+              </div>
+              <div>
+                <strong>ELIOT</strong
+                ><span id="inspector-state">STANDING BY</span>
+              </div>
+              <span class="status-dot"></span>
+            </div>
+            <div class="signal-wave" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i
+              ><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i
+              ><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i
+              ><i></i>
+            </div>
+            <div class="system-model">
+              <span>ACTIVE MODEL</span
+              ><strong id="rail-model">No model connected</strong
+              ><span id="rail-provider">Choose a connection to begin</span>
+            </div>
+          </div>
+          <div class="rail-section">
+            <div class="rail-title">
+              <span class="section-label">MISSION ACTIVITY</span
+              ><svg class="icon"><use href="#i-signal" /></svg>
+            </div>
+            <div class="rail-metrics">
+              <div><strong id="active-count">0</strong><span>Active</span></div>
+              <div><strong id="done-count">0</strong><span>Complete</span></div>
+            </div>
+            <button id="attention-button" class="attention-button" hidden>
+              <span id="attention-count">0</span> missions need attention
+              <span>↗</span>
+            </button>
+            <div id="recent-missions" class="recent-missions"></div>
+          </div>
+          <div class="rail-section knowledge-section">
+            <span class="section-label">KNOWLEDGE SYSTEM</span
+            ><button id="rail-skills" class="knowledge-link">
+              <div class="knowledge-icon">
+                <svg class="icon"><use href="#i-stack" /></svg>
+              </div>
+              <div>
+                <strong
+                  ><span id="rail-skill-count">0</span> installed skills</strong
+                ><small>Pinned. Verified. Ready to read.</small>
+              </div>
+              <span>↗</span>
+            </button>
+          </div>
+          <div class="rail-foot">
+            <span class="status-dot"></span
+            ><span>LOCAL STORAGE · PERSISTENT CONTEXT</span>
+          </div>
+        </aside>
+      </div>
+    </main>
+    <dialog aria-labelledby="dialog-title" id="provider-dialog">
+      <form id="provider-form">
+        <div class="dialog-heading">
+          <div>
+            <div class="eyebrow">PROVIDER PROFILE</div>
+            <h2 id="dialog-title">Make a connection.</h2>
+          </div>
+          <button
+            type="button"
+            id="close-dialog"
+            class="icon-button"
+            aria-label="Close provider settings"
+          >
+            ×
+          </button>
+        </div>
+        <div class="form-row">
+          <label
+            >Display name<input
+              id="p-name"
+              required
+              maxlength="120"
+              placeholder="My model provider" /></label
+          ><label
+            >Profile ID<input
+              id="p-id"
+              required
+              pattern="[a-zA-Z0-9_-]{1,64}"
+              maxlength="64"
+              placeholder="primary"
+          /></label>
+        </div>
+        <label
+          >API base URL<input
+            id="p-url"
+            type="url"
+            required
+            placeholder="https://api.example.com/v1"
+        /></label>
+        <label
+          >Model ID<input
+            id="p-model"
+            required
+            maxlength="200"
+            placeholder="Exact model ID from your provider"
+        /></label>
+        <div class="form-row">
+          <label
+            >Authentication<select id="p-auth">
+              <option value="bearer">API key</option>
+              <option value="none">No key (local server)</option>
+            </select></label
+          ><label
+            >Key environment variable<input
+              id="p-env"
+              value="ELIOT_API_KEY"
+              required
+              pattern="[A-Za-z_][A-Za-z0-9_]*"
+          /></label>
+        </div>
+        <label
+          >Temporary API key <span class="optional">optional</span
+          ><input
+            id="p-key"
+            type="password"
+            autocomplete="new-password"
+            maxlength="4096"
+            placeholder="Set a key for this backend session"
+        /></label>
+        <p class="field-note">
+          Temporary keys stay in backend memory until it exits. To keep a key
+          across restarts, set the environment variable before starting Eliot.
+        </p>
+        <label class="checkbox-label"
+          ><input id="p-stream" type="checkbox" checked /> Stream responses as
+          they arrive</label
+        >
+        <details>
+          <summary>Advanced model settings</summary>
+          <div class="form-row">
+            <label
+              >Timeout (seconds)<input
+                id="p-timeout"
+                type="number"
+                min="1"
+                max="300"
+                value="60"
+                required /></label
+            ><label
+              >Server-error retries<input
+                id="p-retries"
+                type="number"
+                min="0"
+                max="2"
+                value="1"
+                required
+            /></label>
+          </div>
+          <label
+            >Generation parameters (JSON)<textarea
+              id="p-parameters"
+              rows="3"
+              spellcheck="false"
+            >
+{}</textarea
+            >
+          </label>
+          <p class="field-note">
+            Leave empty for compatibility. Add only parameters supported by your
+            model, such as max_tokens or max_completion_tokens.
+          </p>
+        </details>
+        <div id="form-error" class="form-error" role="alert" hidden></div>
+        <div class="dialog-footer">
+          <button type="button" id="cancel-dialog" class="secondary-button">
+            Cancel</button
+          ><button type="submit" id="save-provider" class="primary-button">
+            Save provider ↗
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="mission-dialog" aria-labelledby="mission-dialog-title">
+      <form id="mission-form">
+        <div class="dialog-heading">
+          <div>
+            <span class="eyebrow">NEW OPERATION</span>
+            <h2 id="mission-dialog-title">Give Eliot a mission.</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button"
+            data-close="mission-dialog"
+            aria-label="Close mission form"
+          >
+            ×
+          </button>
+        </div>
+        <label
+          >Objective<textarea
+            id="m-objective"
+            rows="3"
+            required
+            maxlength="12000"
+            placeholder="What should Eliot investigate, and what would a useful result look like?"
+          ></textarea></label
+        ><label
+          >Evidence workspace<input
+            id="m-workspace"
+            required
+            placeholder="/home/kali/engagements/my-assessment"
+        /></label>
+        <p class="field-note">
+          An existing folder on the machine running Eliot. Reports are saved
+          inside this workspace.
+        </p>
+        <div class="form-row">
+          <label
+            >Model connection<select id="m-provider" required></select></label
+          ><label>Persona<select id="m-persona"></select></label>
+        </div>
+        <div class="form-row">
+          <label
+            >Parallel workers<input
+              id="m-workers"
+              type="number"
+              min="1"
+              max="6"
+              value="3"
+              required /></label
+          ><label
+            >Step budget <span class="optional">0 = unlimited</span
+            ><input id="m-steps" type="number" min="0" value="0" required
+          /></label>
+        </div>
+        <label class="checkbox-label network-option"
+          ><input id="m-network" type="checkbox" /><span
+            >Enable observations of specified targets</span
+          ></label
+        ><label id="targets-field" hidden
+          >Exact target hostnames or IPs<textarea
+            id="m-targets"
+            rows="2"
+            placeholder="One hostname or IP per line. No URLs or wildcards."
+          ></textarea>
+        </label>
+        <details>
+          <summary>Skills and usage settings</summary>
+          <label
+            >Token budget <span class="optional">0 = unlimited</span
+            ><input
+              id="m-tokens"
+              type="number"
+              min="0"
+              value="0"
+              required /></label
+          ><label
+            >Skill modules <span class="optional">up to 12</span
+            ><select id="m-skills" multiple size="6"></select
+          ></label>
+          <p class="field-note">
+            Scope triage and finding validation are selected by default. Ctrl/⌘
+            + click to select several skills.
+          </p>
+        </details>
+        <div
+          id="mission-form-error"
+          class="form-error"
+          role="alert"
+          hidden
+        ></div>
+        <div class="dialog-footer">
+          <button
+            type="button"
+            class="secondary-button"
+            data-close="mission-dialog"
+          >
+            Cancel</button
+          ><button id="launch-mission" class="primary-button" type="submit">
+            Launch mission ↗
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog aria-labelledby="persona-dialog-title" id="persona-dialog">
+      <form id="persona-form">
+        <div class="dialog-heading">
+          <div>
+            <span class="eyebrow">CUSTOM CHARACTER</span>
+            <h2 id="persona-dialog-title">Make Eliot your own.</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button"
+            data-close="persona-dialog"
+            aria-label="Close persona form"
+          >
+            ×
+          </button>
+        </div>
+        <div class="form-row">
+          <label>Name<input id="persona-name" required maxlength="120" /></label
+          ><label
+            >Unique ID<input
+              id="persona-id"
+              required
+              maxlength="64"
+              pattern="[a-zA-Z0-9_-]{1,64}"
+              placeholder="my-analyst"
+          /></label>
+        </div>
+        <label
+          >Import a text or Markdown file<input
+            id="persona-file"
+            type="file"
+            accept=".txt,.md,text/plain,text/markdown" /></label
+        ><label
+          >Persona instructions<textarea
+            id="persona-text"
+            required
+            rows="8"
+            maxlength="12000"
+            placeholder="Describe communication style, expertise and working preferences…"
+          ></textarea>
+        </label>
+        <p class="field-note">
+          Personas guide character and style beneath the fixed system rules.
+          Existing missions retain their original persona snapshot.
+        </p>
+        <div id="persona-error" class="form-error" role="alert" hidden></div>
+        <div class="dialog-footer">
+          <button
+            type="button"
+            class="secondary-button"
+            data-close="persona-dialog"
+          >
+            Cancel</button
+          ><button id="save-persona" type="submit" class="primary-button">
+            Save persona ↗
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog
+      aria-labelledby="skill-title"
+      id="skill-dialog"
+      class="skill-dialog"
+    >
+      <div class="dialog-heading">
+        <div>
+          <span class="eyebrow">INSTALLED SKILL</span>
+          <h2 id="skill-title"></h2>
+        </div>
+        <button
+          type="button"
+          class="icon-button"
+          data-close="skill-dialog"
+          aria-label="Close skill"
+        >
+          ×
+        </button>
+      </div>
+      <p id="skill-description" class="skill-description"></p>
+      <div class="skill-provenance">
+        <span id="skill-revision"></span
+        ><a id="skill-source" target="_blank" rel="noopener noreferrer"
+          >View upstream ↗</a
+        >
+      </div>
+      <pre id="skill-content" class="skill-content"></pre>
+      <button id="skill-more" class="secondary-button" hidden>
+        Read next page ↓
+      </button>
+    </dialog>
+    <dialog id="resume-dialog" aria-labelledby="resume-title">
+      <form id="resume-form">
+        <div class="dialog-heading">
+          <div>
+            <span class="eyebrow">CONTINUE THE INVESTIGATION</span>
+            <h2 id="resume-title">Pick up the thread.</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button"
+            data-close="resume-dialog"
+            aria-label="Close resume settings"
+          >
+            ×
+          </button>
+        </div>
+        <p class="field-note">
+          Eliot keeps its evidence and working context. Add feedback to the
+          mission before resuming if its approach needs to change.
+        </p>
+        <div class="form-row">
+          <label
+            >Step budget <span class="optional">0 = unlimited</span
+            ><input id="resume-steps" required type="number" min="0" /></label
+          ><label
+            >Token budget <span class="optional">0 = unlimited</span
+            ><input id="resume-tokens" required type="number" min="0"
+          /></label>
+        </div>
+        <p id="resume-worker-note" class="field-note" hidden>
+          Worker budgets are inherited. Change limits on the coordinator
+          mission.
+        </p>
+        <div id="resume-error" class="form-error" role="alert" hidden></div>
+        <div class="dialog-footer">
+          <button
+            type="button"
+            class="secondary-button"
+            data-close="resume-dialog"
+          >
+            Keep paused</button
+          ><button id="resume-submit" type="submit" class="primary-button">
+            Resume mission ↗
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog
+      id="confirm-dialog"
+      aria-labelledby="confirm-title"
+      aria-describedby="confirm-message"
+    >
+      <form method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <span class="eyebrow">WORKSPACE ACTION</span>
+            <h2 id="confirm-title">Confirm this action.</h2>
+          </div>
+        </div>
+        <p id="confirm-message" class="skill-description"></p>
+        <div class="dialog-footer">
+          <button class="secondary-button" value="cancel" autofocus>
+            Keep unchanged</button
+          ><button id="confirm-accept" class="primary-button" value="accept">
+            Confirm
+          </button>
+        </div>
+      </form>
+    </dialog>
+  </body>
 </html>

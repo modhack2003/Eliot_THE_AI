@@ -247,6 +247,10 @@ def create_app(config_path=None, gateway=None):
     async def skills():
         return missions.catalog.list()
 
+    @app.get("/api/skills/{skill_id}")
+    async def skill_page(skill_id: str, start_line: int = 1):
+        return missions.catalog.read(skill_id, start_line=start_line, limit=120)
+
     @app.get("/api/personas")
     async def personas():
         return missions.store.personas()

@@ -1,5 +1,17 @@
 # Changes
 
+## 2.0.0a4 — 25 October 2026
+
+- Rebuilt the browser workspace with obsidian glass, cyan/amber accents and a
+  procedural animated neural core driven by actual task/chat activity.
+- Added mission creation, worker inspection, event journals, feedback, pause,
+  resume with budget adjustments and cancellation to the browser.
+- Added searchable pinned skills with a paginated reader, persona import/edit
+  and persona selection for conversations and new missions.
+- Added responsive navigation, keyboard library tabs, reduced-motion support
+  and animation throttling when hidden. Kept assets local with no JS build step.
+- Added skill-reader API regression coverage and installed-asset checks.
+
 ## 2.0.0a3 â€” 24 October 2026
 
 - Added one-command Kali/Debian/Ubuntu setup with automatic OS prerequisites,

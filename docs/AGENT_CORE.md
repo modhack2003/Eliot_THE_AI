@@ -137,7 +137,8 @@ revision, attribution, content licensing and exclusions.
 
 ## HTTP API
 
-- `GET /api/skills`, `GET /api/instructions` (read-only rules/hash).
+- `GET /api/skills`, `GET /api/skills/ID?start_line=1` (pinned Markdown pages).
+- `GET /api/instructions` (read-only rules/hash).
 - `GET /api/personas`, `PUT /api/personas/ID` (`name`, `instructions`).
 - `POST /api/tasks` (objective, workspace, provider/persona, skills, scope, budgets).
 - `GET /api/tasks`, `GET /api/tasks/ID`, `GET /api/tasks/ID/events?after=EVENT_ID`.
@@ -145,6 +146,7 @@ revision, attribution, content licensing and exclusions.
 - `POST /api/tasks/ID/pause`, `/resume`, `/cancel`.
 
 Use the existing local same-origin token from `/api/bootstrap` for mutations.
-This milestone exposes the task core through CLI/API; a task-control dashboard,
-voice, the sci-fi face/animation design, broader Kali adapters, sandbox workers
-and more specialized assessment workflows remain future work.
+The task core is available through CLI/API and the browser mission dashboard.
+See [the workspace guide](WORKSPACE.md) for the animated interface, skill reader
+and persona controls. Voice, broader Kali adapters, sandbox workers and more
+specialized assessment workflows remain future work.

@@ -7,8 +7,9 @@ Connect an OpenAI-compatible Chat Completions endpoint, select its exact model I
 and use your own API key. Local model servers can run without authentication.
 Conversations and run history are stored in SQLite on your machine.
 
-Version **2.0.0a3** adds one-command installation and a clearer project structure
-on top of the durable cybersecurity agent core: coordinator/worker
+Version **2.0.0a4** adds a new animated intelligence workspace, browser mission
+controls and a searchable skills/persona library on top of one-command
+installation and the durable cybersecurity agent core: coordinator/worker
 tasks, typed evidence tools, scoped observations, checkpoints, completion review,
 uploaded personas and 83 default skill modules. Ordinary conversation remains
 separate from task execution. The original broad security-tool integrations
@@ -66,9 +67,22 @@ The backend binds to loopback and accepts local clients only. Keep one backend
 process per configuration/database. This alpha does not support remote hosting
 or multiple server workers.
 
+## The intelligence workspace
+
+- **Command:** conversation, model/persona selection and an animated neural core.
+- **Missions:** launch an investigation, follow workers and recorded decisions,
+  add feedback, pause, resume or cancel. Tasks continue while the backend runs.
+- **Skills & personas:** search 83 bundled modules, read their pinned guidance,
+  and import or edit your own text persona.
+- **Connections:** configure and test your compatible API profiles.
+
+Motion can be paused and follows your reduced-motion preference by default.
+The activity indicators reflect recorded backend state. See the
+[workspace guide](docs/WORKSPACE.md) for the full workflow.
+
 ## Connect a model
 
-Start without any configuration file and choose **Connect your first provider**.
+Start without any configuration file and choose **Connect your first model**.
 Enter a name, API base URL (including the provider's version prefix if required),
 and the exact model ID from your provider. Eliot appends `/chat/completions`.
 
@@ -229,6 +243,6 @@ code contract, external-session handling and historical packaging still need
 migration and validation. This release does not claim those features are fixed.
 
 Next milestones: broader Kali tool adapters, stronger workflow-specific finding
-validators, isolated worker environments, Linux integration validation and the
-new visual interface. Keep the original attribution and third-party notices
+validators, isolated worker environments, broader Linux tool integration
+validation and voice interaction. Keep the original attribution and third-party notices
 when redistributing.
