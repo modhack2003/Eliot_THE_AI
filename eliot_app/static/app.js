@@ -100,11 +100,20 @@ async function refreshSessions() {
     $("sessions").append(el);
   });
 }
+// Eliot's expression is driven by recorded run state: "thinking" once a
+// response is queued, "talking" once its text begins to arrive. Decorative.
+function setSpeech(state) {
+  if (document.body.dataset.speech === (state || "")) return;
+  if (state) document.body.dataset.speech = state;
+  else delete document.body.dataset.speech;
+  document.dispatchEvent(new Event("eliot-emotion"));
+}
 function detach() {
   if (source) source.close();
   source = null;
   currentRun = null;
   streamConnected = true;
+  setSpeech(null);
 }
 function newChat() {
   if (submitting) return;
@@ -241,6 +250,8 @@ function watch(id, article) {
           $("conversation").scrollTop -
           $("conversation").clientHeight <
         150;
+      if (["queued", "running"].includes(run.status))
+        setSpeech(run.text ? "talking" : "thinking");
       renderRun(run, article);
       if (nearBottom) scrollBottom();
       if (!["queued", "running"].includes(run.status)) {
@@ -272,6 +283,7 @@ $("chat-form").addEventListener("submit", async (event) => {
     addMessage("user", content);
     const article = addMessage("assistant", "Thinking…", run.id);
     currentRun = run.id;
+    setSpeech("thinking");
     $("export-session").href = `/api/sessions/${currentSession}/export`;
     $("export-session").hidden = false;
     $("delete-session").hidden = false;

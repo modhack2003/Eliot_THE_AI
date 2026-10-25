@@ -1,5 +1,21 @@
 # Changes
 
+## Unreleased
+
+- Replaced the neural core with a cinematic multi-pass WebGL2 renderer:
+  a raymarched volumetric entity with filamentary structure, bloom, chromatic
+  aberration, scanlines, film grain and glitch grading.
+- Added an emotional state machine covering idle, thinking, talking, working
+  and alert. Thinking and talking are driven by recorded run state, so the
+  core concentrates inward while a response forms and pulses outward while its
+  text streams. Transitions are smoothed rather than switched.
+- Kept the 2D canvas core as an automatic fallback when WebGL2 is unavailable
+  or its context is lost, and added a quality tier that drops shader cost after
+  sustained slow frames.
+- Kept all assets local with no JS build step, no external libraries and no
+  change to the content security policy. Motion still honours the pause control
+  and reduced-motion preference.
+
 ## 2.0.0a5 — 25 October 2026
 
 - Preserved delegation checkpoints when workers pause or exhaust a budget;

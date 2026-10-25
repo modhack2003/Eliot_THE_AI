@@ -41,7 +41,7 @@ def verify(prefix):
                 else:
                     raise RuntimeError("Backend did not become ready: " + log.read_text())
                 assert bootstrap["version"] == state["version"]
-                for resource in ("/", "/static/app.js", "/static/style.css", "/static/workspace.js", "/static/neural.js", "/static/transport.js"):
+                for resource in ("/", "/static/app.js", "/static/style.css", "/static/workspace.js", "/static/neural.js", "/static/eliot-core.js", "/static/transport.js"):
                     with opener.open(url + resource, timeout=3) as response:
                         assert response.status == 200 and response.read()
                 with opener.open(url + "/api/skills", timeout=3) as response:
