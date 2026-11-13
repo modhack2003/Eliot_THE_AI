@@ -121,32 +121,43 @@ async def verify_contract(runtime, mission):
                     else "Required file or text absent"
                 )
             else:
-                for member in runtime.store.list(mission["root_id"]):
-                    for action in runtime.store.actions(member["id"]):
-                        output = action["result"].get("output", {})
-                        if not action["result"].get("ok"):
+                actions = [
+                    action
+                    for member in runtime.store.list(mission["root_id"])
+                    for action in runtime.store.actions(member["id"])
+                ]
+                for action in sorted(
+                    actions, key=lambda item: item["created"], reverse=True
+                ):
+                    output = action["result"].get("output", {})
+                    request = json.loads(action["request"])
+                    if check.kind == "command_exit" and request["tool"] == (
+                        check.tool or "run_command"
+                    ):
+                        argv = request.get("arguments", {}).get("argv", [])
+                        if check.path and (not argv or argv[0] != check.path):
                             continue
-                        request = json.loads(action["request"])
-                        if check.kind == "command_exit" and request["tool"] == (
-                            check.tool or "run_command"
-                        ):
-                            # Bind the check to an explicit command executable when supplied.
-                            argv = request.get("arguments", {}).get("argv", [])
-                            if check.path and (not argv or argv[0] != check.path):
-                                continue
-                            passed = output.get("returncode") == check.expected
-                        if (
-                            check.kind == "http_status"
-                            and request["tool"] == "http_observe"
-                        ):
-                            if check.path and output.get("url") != check.path:
-                                continue
-                            passed = output.get("status") == check.expected
-                        if passed:
-                            reason = "Recorded tool outcome matches"
-                            break
-                    if passed:
-                        break
+                        passed = (
+                            bool(action["result"].get("ok"))
+                            and output.get("returncode") == check.expected
+                        )
+                    elif (
+                        check.kind == "http_status"
+                        and request["tool"] == "http_observe"
+                    ):
+                        url = output.get("url") or request.get("arguments", {}).get(
+                            "url"
+                        )
+                        if check.path and url != check.path:
+                            continue
+                        passed = (
+                            bool(action["result"].get("ok"))
+                            and output.get("status") == check.expected
+                        )
+                    else:
+                        continue
+                    reason = "Latest matching tool outcome inspected"
+                    break
         except (ConfigError, OSError, UnicodeError, ValueError):
             reason = "Required evidence is unavailable"
         results.append(

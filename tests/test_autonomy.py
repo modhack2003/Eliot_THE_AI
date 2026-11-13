@@ -65,7 +65,7 @@ async def test_versioned_edit_preview_conflict_and_rollback(tmp_path):
         await runtime.tools.execute(
             mission, "rollback_file", {"version_id": result["version_id"]}
         )
-    path.write_text("after\n")
+    path.write_bytes(b"after\n")
     await runtime.tools.execute(
         mission, "rollback_file", {"version_id": result["version_id"]}
     )
@@ -534,3 +534,40 @@ async def test_vision_profile_attaches_recorded_image_without_modifying_bytes(tm
         if part["type"] == "image_url"
     ]
     assert images and base64.b64decode(images[0].split(",", 1)[1]) == image
+
+
+async def test_outcome_check_uses_latest_matching_observation(tmp_path):
+    from eliot_app.contracts import verify_contract
+
+    runtime, mission = await paused(
+        tmp_path,
+        success_checks=[
+            {"kind": "http_status", "path": "https://lab.example/", "expected": 200}
+        ],
+    )
+    request = {"tool": "http_observe", "arguments": {"url": "https://lab.example/"}}
+    for identifier, status in [("old", 200), ("new", 404)]:
+        runtime.store.start_action(mission["id"], identifier, request)
+        runtime.store.finish_action(
+            mission["id"],
+            identifier,
+            {"ok": True, "output": {"url": "https://lab.example/", "status": status}},
+        )
+    assert not (await verify_contract(runtime, mission))[0]["passed"]
+
+
+async def test_unmeasured_monetary_budget_parks_without_repeated_paid_attempts(
+    tmp_path,
+):
+    from test_gateway import profile
+
+    runtime = setup_runtime(tmp_path)
+    runtime.service.settings.save_provider(
+        profile(auth="none", input_cost_per_million=1, output_cost_per_million=1)
+    )
+    mission = runtime.create(
+        "Review evidence", str(tmp_path), options={"cost_budget_usd": 1}
+    )
+    result = await finished(runtime, mission["id"])
+    assert result["status"] == "blocked" and "measured input/output" in result["reason"]
+    assert len(runtime.service.gateway.calls) == 1

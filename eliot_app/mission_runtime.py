@@ -305,6 +305,8 @@ class MissionRuntime:
                 else:
                     try:
                         decision = parse_object(await self.model(mission, self.context(mission)), Decision)
+                    except ConfigError:
+                        raise
                     except (ValidationError, ValueError, TypeError):
                         state["stalls"] = state.get("stalls", 0)+1
                         self.store.event(mission_id, "invalid_decision", {"reason": "Return valid JSON matching decision_schema."})
@@ -405,6 +407,11 @@ class MissionRuntime:
             if "pending" in state:
                 self.store.save(mission_id, state=state)
             old = self.store.action(mission_id, action_id)
+            if old and old['status']=='pending' and decision.tool in {'run_command','run_python','browser_action','desktop_action','robot_action'}:
+                uncertain={'ok':False,'interrupted':True,'error':'Host action was interrupted before its result was recorded. Inspect actual state before deciding to retry.'}
+                self.store.finish_action(mission_id,action_id,uncertain)
+                self.store.event(mission_id,'tool_result',{'action_id':action_id,'tool':decision.tool,**uncertain})
+                return False
             if old and old["status"] == "done" and old["result"].get("ok"):
                 self.store.event(mission_id, "cached_action", {"action_id": action_id, "result": old["result"]})
                 return False

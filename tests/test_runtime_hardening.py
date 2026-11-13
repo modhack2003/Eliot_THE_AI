@@ -137,3 +137,35 @@ async def test_duplicate_delegation_reuses_worker_and_blocks_cycle(tmp_path):
     result = await finished(runtime, root["id"])
     assert result["status"] == "blocked"
     assert len(runtime.store.list(root["id"])) == 2
+
+
+async def test_crash_pending_host_effect_is_not_blindly_replayed(tmp_path):
+    runtime, root = await paused(tmp_path)
+    root["policy"]["host_execution"] = True
+    decision = tool(
+        "run_python",
+        code="raise AssertionError('must not execute a pending effect after crash')",
+    )
+    request = {
+        "tool": decision.tool,
+        "arguments": decision.arguments,
+        "feedback": [],
+        "execution_step": root["steps"],
+    }
+    import hashlib
+
+    identifier = hashlib.sha256(
+        json.dumps(request, sort_keys=True).encode()
+    ).hexdigest()[:24]
+    runtime.store.start_action(root["id"], identifier, request)
+    runtime.store.save(
+        root["id"],
+        state={
+            **root["state"],
+            "pending_action_id": identifier,
+            "pending": decision.model_dump(),
+        },
+    )
+    assert not await runtime._decision(runtime.store.get(root["id"]), decision)
+    result = runtime.store.action(root["id"], identifier)["result"]
+    assert result["interrupted"] and "Inspect actual state" in result["error"]

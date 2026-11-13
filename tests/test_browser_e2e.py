@@ -15,7 +15,10 @@ import pytest
 
 @pytest.mark.skipif(
     importlib.util.find_spec("playwright") is None
-    or (not (shutil.which("chromium") or shutil.which("google-chrome")) and os.environ.get("CI") != "true"),
+    or (
+        not (shutil.which("chromium") or shutil.which("google-chrome"))
+        and os.environ.get("CI") != "true"
+    ),
     reason="Optional Playwright/system Chromium integration dependencies are missing",
 )
 def test_browser_host_mission_and_schedule(tmp_path):
@@ -70,6 +73,7 @@ def test_browser_host_mission_and_schedule(tmp_path):
                 page.locator("#p-model").fill("fixture-model")
                 page.locator("#p-auth").select_option("none")
                 page.locator("#save-provider").click()
+                page.locator("#provider-dialog").wait_for(state="hidden")
                 page.locator("#hero-mission").click()
                 page.locator("#m-objective").fill("Create and verify a result file")
                 page.locator("#m-workspace").fill(str(tmp_path))

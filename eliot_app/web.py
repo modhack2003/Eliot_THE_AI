@@ -10,7 +10,7 @@ import secrets
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import __version__
@@ -81,6 +81,18 @@ class Profile(BaseModel):
     output_cost_per_million: float | None = None
     vision: bool = False
     structured_output: bool = False
+
+
+class ToggleSchedule(BaseModel):
+    enabled: StrictBool
+
+
+class TriggerSchedule(BaseModel):
+    event_id: str = Field(min_length=1,max_length=200)
+
+
+class CorrectMemory(BaseModel):
+    text: str = Field(min_length=1,max_length=6000)
 
 
 class TemporaryKey(BaseModel):
@@ -348,10 +360,9 @@ def create_app(config_path=None, gateway=None, external_worker=False):
         return missions.tools.knowledge.recall(missions.store.get(task_id),query,scope,offset=max(0,offset))
 
     @app.put('/api/tasks/{task_id}/memory/{memory_id}')
-    async def correct_memory(task_id: str,memory_id: str,request: Request):
+    async def correct_memory(task_id: str,memory_id: str,item: CorrectMemory):
         mission=missions.store.get(task_id)
-        payload=await request.json()
-        text=payload.get('text')
+        text=item.text
         if not isinstance(text,str) or not 1<=len(text)<=6000:raise ConfigError('Supply corrected memory text of up to 6,000 characters.')
         with service.store.connection() as db:row=db.execute('SELECT * FROM agent_memory WHERE id=?',(memory_id,)).fetchone()
         if not row or row['scope_key']!=missions.tools.knowledge.key(mission,row['scope']):raise KeyError(memory_id)
@@ -373,17 +384,12 @@ def create_app(config_path=None, gateway=None, external_worker=False):
     async def delete_schedule(schedule_id: str):return scheduler.delete(schedule_id)
 
     @app.post('/api/schedules/{schedule_id}/enabled')
-    async def enable_schedule(schedule_id: str,request: Request):
-        payload=await request.json()
-        if type(payload.get('enabled')) is not bool:raise ConfigError('enabled must be a boolean.')
-        return scheduler.set_enabled(schedule_id,payload['enabled'])
+    async def enable_schedule(schedule_id: str,item: ToggleSchedule):
+        return scheduler.set_enabled(schedule_id,item.enabled)
 
     @app.post('/api/schedules/{schedule_id}/trigger')
-    async def trigger_schedule(schedule_id: str,request: Request):
-        payload=await request.json()
-        event_id=payload.get('event_id')
-        if not isinstance(event_id,str):raise ConfigError('Supply a stable event identifier.')
-        return scheduler.trigger(schedule_id,event_id)
+    async def trigger_schedule(schedule_id: str,item: TriggerSchedule):
+        return scheduler.trigger(schedule_id,item.event_id)
 
     @app.post("/api/tasks/{task_id}/{action}")
     async def task_control(task_id: str, action: str, item: TaskResume | None = None):

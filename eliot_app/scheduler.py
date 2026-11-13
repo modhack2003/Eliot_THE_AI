@@ -7,7 +7,7 @@ import hashlib
 import json
 import time
 from uuid import uuid4
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from .config import ConfigError
 from .store import BusyError
 
@@ -65,7 +65,12 @@ class Scheduler:
         item = ScheduleInput.model_validate(raw)
         from .web import NewTask
 
-        task = NewTask.model_validate(item.task).model_dump()
+        try:
+            task = NewTask.model_validate(item.task).model_dump()
+        except ValidationError:
+            raise ConfigError(
+                "Invalid scheduled task fields. Use the mission creation schema."
+            ) from None
         # Validate configuration and paths without starting an execution.
         self.runtime.service.provider(task.get("provider_id"))
         from pathlib import Path

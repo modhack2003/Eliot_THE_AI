@@ -496,8 +496,8 @@ $("provider-form").addEventListener("submit", async (event) => {
         api_key: $("p-key").value.trim(),
       });
     $("p-key").value = "";
-    $("provider-dialog").close();
     await refreshProviders();
+    $("provider-dialog").close();
     notice(
       "Provider saved. Use Test connection when you’re ready to send a short test request.",
     );
