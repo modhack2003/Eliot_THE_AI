@@ -1,5 +1,14 @@
 # Changes
 
+## 2.0.0a6 — 14 November 2026
+
+- Fixed artifact ownership, endpoint credential binding, stale/failed action caching, cancellation journaling, source coverage and repeated delegation.
+- Added direct host commands/Python, versioned edits/rollback, structured plans, completion checks, evidence lookup and source-backed memory.
+- Added durable schedules, event deduplication, a supervised worker lease and opt-in role/model routing.
+- Added optional host browser/desktop/robotics adapters, image observations, speech controls, mission metrics, pagination and export.
+- Added dependency constraints, first-party secret/static/security checks and regression/browser flow evaluations.
+- Preserved the owner requirement: no execution-isolation layer. See review_and_roadmap.md and docs/HOST_AGENT.md for validation limits.
+
 ## 2.0.0a5 — 25 October 2026
 
 - Preserved delegation checkpoints when workers pause or exhaust a budget;

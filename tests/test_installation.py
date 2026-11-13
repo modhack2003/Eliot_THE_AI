@@ -76,7 +76,7 @@ def test_failed_upgrade_preserves_pointer_launcher_config_and_data(tmp_path, mon
     monkeypatch.setattr(installer, "run", fail_on_diagnostics)
     with pytest.raises(subprocess.CalledProcessError):
         installer.install(prefix, no_desktop=True)
-    assert len(calls) == 3  # Fresh venv, install, offline verification before activation.
+    assert len(calls) == 4  # Fresh venv, patched pip, constrained install, offline verification.
     assert pointer.read_text() == '{"runtime":"previous-runtime"}'
     assert launcher.read_text() == "old-launcher"
     assert config.read_text() == "keep-provider-config" and database.read_bytes() == b"saved work"

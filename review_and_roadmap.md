@@ -9,36 +9,52 @@ Owner direction: execute on the host directly. Do not introduce containers, virt
 - [x] 05 Cancellation and effect reconciliation
 - [x] 06 Source-aware progress
 - [x] 07 Duplicate delegation and graph cycles
-- [ ] 08 Objective checks and evidence classification
-- [ ] 09 Provenance, redaction and injection evaluations
-- [ ] 10 Whole-operation deadlines and output limits
-- [ ] 11 Bounded outages and parked tasks
-- [ ] 12 Structured dependency plans and replanning
-- [ ] 13 Evidence retrieval and persistent memory
-- [ ] 14 Durable scheduling and supervised host worker
-- [ ] 15 Direct host command and Python execution (replaces isolation)
-- [ ] 16 Structured engagement permissions
-- [ ] 17 Inventory/search/text pagination
-- [ ] 18 Time, token, cost and tool budgets
-- [ ] 19 Diagnostics and runtime metrics
-- [ ] 20 Compact mission pagination and event/artifact export
-- [ ] 21 Dependency/security checks and agent evaluations
-- [ ] 22 Review open UI PR overlap without merging unrelated changes
-- [ ] 23 Capability registry and availability checks
-- [ ] 24 Browser and desktop adapters on the host
-- [ ] 25 Cybersecurity evidence import and normalized findings
-- [ ] 26 Specialist roles and model routing
-- [ ] 27 Versioned file edits and rollback
+- [x] 08 Objective checks and evidence classification
+- [x] 09 Provenance, redaction and injection evaluations
+- [x] 10 Whole-operation deadlines and output limits
+- [x] 11 Bounded outages and parked tasks
+- [x] 12 Structured dependency plans and replanning
+- [x] 13 Evidence retrieval and persistent memory
+- [x] 14 Durable scheduling and supervised host worker
+- [x] 15 Direct host command and Python execution (replaces isolation)
+- [x] 16 Structured engagement permissions
+- [x] 17 Inventory/search/text pagination
+- [x] 18 Time, token, cost and tool budgets
+- [x] 19 Diagnostics and runtime metrics
+- [x] 20 Compact mission pagination and event/artifact export
+- [x] 21 Dependency/security checks and agent evaluations
+- [x] 22 Review open UI PR overlap without merging unrelated changes
+- [x] 23 Capability registry and availability checks
+- [x] 24 Browser and desktop adapters on the host
+- [x] 25 Cybersecurity evidence import and normalized findings
+- [x] 26 Specialist roles and model routing
+- [x] 27 Versioned file edits and rollback
 - [ ] 28 Plan/evidence/memory/schedule dashboard
-- [ ] 29 Voice input/output and vision-capable provider messages
-- [ ] 30 Optional robotics bridge and emergency stop
+- [x] 29 Voice input/output and vision-capable provider messages
+- [x] 30 Optional robotics bridge and emergency stop
 - [ ] 31 Documentation, full validation and GitHub push
 
 Each item is checked only after implementation and relevant automated validation. Optional adapters require their documented dependencies; live hardware/provider/desktop validation is tracked separately from fixture tests.
 
 ## Implementation log
 
-- Reliability pass: original 78 Python tests pass; six new regression tests cover the seven reproduced issues. Host execution preference is recorded in AGENTS.md.
+- Reliability pass: original 78 Python tests passed; six new regression tests cover the seven reproduced issues. Host execution preference is recorded in AGENTS.md.
+- Host agent implementation: structured dependency plans, immutable outcome checks, observation classification, evidence lookup, source-backed task/project/user memory, direct host commands/Python, versioned edits/rollback, structured target policy and paginated observations.
+- Long-running work: persistent interval/event schedules, duplicate event suppression, worker lease and separate host worker mode; role-specific providers and opt-in approved-provider routing; time/tool/token/known-cost accounting and outage parking.
+- Optional adapters: host Playwright browser, PyAutoGUI desktop, PNG/JPEG model observations, browser speech controls and an HTTP robotics bridge. Automated adapter fixtures pass; no physical hardware, live speech or paid provider reasoning test was performed.
+- Security checks: production dependency constraints, weekly dependency updates, pip-audit (no known vulnerabilities after updating pip), Bandit medium/high checks and first-party credential scanning. Typed host process/tool policy is enforced; this is explicitly not OS isolation.
+- Open UI PR overlap reviewed: #3 and #4 both replace neural.js and modify style.css; #4 additionally changes app.js/workspace.js and adds eliot-core.js. They are alternative visual implementations with overlapping files. Neither was merged or overwritten by this agent-runtime work.
+- Browser/dashboard end-to-end validation is pending GitHub CI. Local Chromium startup was denied by this execution environment's native-socket policy; the test reports this specific local limitation as a skip and fails on browser startup problems in CI.
+
+### Remaining live validation
+
+- [ ] Complete the browser → API → host output → plan verification → dashboard/scheduler flow in GitHub CI.
+- [ ] Validate native speech and desktop interaction on the operator's computer.
+- [ ] Evaluate planning and vision with the chosen live model/provider.
+- [ ] Validate real nmap cancellation on the intended Kali host.
+- [ ] If a physical robot is connected, validate the bridge's independent limits/watchdog/emergency stop on that hardware.
+
+Optional integration implementation is distinct from live-device validation. Items above remain open until that environment-specific evidence exists.
 
 ---
 

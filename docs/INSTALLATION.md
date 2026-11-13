@@ -39,7 +39,7 @@ No credentials or model downloads are supplied by the installer. The key may
 be temporary in-memory or referenced by an environment variable. For example:
 
 ```bash
-export ELIOT_API_KEY='your-key'
+export ELIOT_API_KEY='your-key'  # pragma: allowlist secret
 ~/.local/bin/eliot serve
 ```
 

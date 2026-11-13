@@ -1,8 +1,6 @@
 import asyncio
 import hashlib
 import json
-from pathlib import Path
-import shutil
 
 from fastapi.testclient import TestClient
 import httpx
@@ -66,7 +64,7 @@ async def test_real_tool_evidence_and_independent_completion_review(tmp_path):
     result = await finished(runtime, mission["id"])
     assert result["status"] == "completed" and result["steps"] == 2
     events = runtime.store.events(mission["id"])
-    assert [e["kind"] for e in events] == ["created","decision","tool_result","decision","review"]
+    assert [e["kind"] for e in events if e["kind"] not in {"model_usage","tool_metrics"}] == ["created","decision","tool_result","decision","review"]
     assert runtime.store.totals(mission["id"])["tokens"] == 30
     assert len(planner.calls) == 3
 
@@ -254,15 +252,11 @@ async def test_nmap_uses_validated_arguments_without_a_shell(tmp_path, monkeypat
     mission = runtime.create("Discover authorized service",str(tmp_path),network=True,targets=["in.example"])
     await runtime.control(mission["id"],"pause")
     calls = []
-    class Process:
-        returncode = 0
-        async def communicate(self):
-            return b'<nmaprun><host><ports><port portid="443"><state state="open"/><service name="https"/></port></ports></host></nmaprun>', b''
-    async def spawn(*args, **kwargs):
-        calls.append((args,kwargs))
-        return Process()
+    async def run(argv,**kwargs):
+        calls.append((argv,kwargs))
+        return {'returncode':0,'stdout':'<nmaprun><host><ports><port portid="443"><state state="open"/><service name="https"/></port></ports></host></nmaprun>','stderr':''}
     monkeypatch.setattr(module.shutil,"which",lambda name:"/usr/bin/nmap")
-    monkeypatch.setattr(module.asyncio,"create_subprocess_exec",spawn)
+    monkeypatch.setattr(module,"run_process",run)
     result = await runtime.tools.execute(mission,"nmap_services",{"host":"in.example","ports":[443]})
     assert result["observations"][0]["service"]["name"] == "https"
     assert calls[0][0][-1] == "in.example"

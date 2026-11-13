@@ -25,6 +25,16 @@ def main():
     commands = parser.add_subparsers(dest="command")
     serve = commands.add_parser("serve", help="Start the local backend and web interface")
     serve.add_argument("--port", type=int, default=8765)
+    serve.add_argument('--external-worker',action='store_true',help='Serve the UI/API while a separate eliot worker executes tasks')
+    commands.add_parser('worker',help='Run the supervised host mission worker and scheduler without a web server')
+    schedules=commands.add_parser('schedules',help='Manage durable scheduled missions')
+    schedule_actions=schedules.add_subparsers(dest='action')
+    schedule_actions.add_parser('list')
+    schedule_create=schedule_actions.add_parser('create')
+    schedule_create.add_argument('--file',required=True,help='JSON schedule definition')
+    for action in ['delete','enable','disable','trigger']:
+        entry=schedule_actions.add_parser(action);entry.add_argument('id')
+        if action=='trigger':entry.add_argument('event_id')
     doctor = commands.add_parser("doctor", help="Check dependencies, storage, web assets and skill integrity offline")
     doctor.add_argument("--json", action="store_true", help="Machine-readable readiness report")
     doctor.add_argument("--strict", action="store_true", help="Exit unsuccessfully if a required check fails")
@@ -54,6 +64,10 @@ def main():
     create.add_argument("--max-steps", type=int, default=0)
     create.add_argument("--token-budget", type=int, default=0)
     create.add_argument("--max-workers", type=int, default=3)
+    create.add_argument('--host',action='store_true',help='Allow direct host commands and Python (no isolation)')
+    create.add_argument('--edit',action='store_true',help='Allow versioned workspace file edits')
+    create.add_argument('--options',default='{}',help='Additional mission options as JSON')
+    create.add_argument('--checks',default='[]',help='Operator completion checks as JSON')
     for action in ["show", "watch", "pause", "resume", "cancel", "feedback"]:
         item = task_actions.add_parser(action)
         item.add_argument("id")
@@ -62,6 +76,7 @@ def main():
         if action == "resume":
             item.add_argument("--max-steps", type=int)
             item.add_argument("--token-budget", type=int)
+            item.add_argument("--rebind-provider",action="store_true")
     task_actions.add_parser("list")
     providers = commands.add_parser("providers", help="Manage providers through the running backend")
     actions = providers.add_subparsers(dest="action")
@@ -81,13 +96,26 @@ def main():
         parser.print_help()
         return
     try:
+        if args.command=='worker':
+            import asyncio
+            from .service import Service
+            from .mission_runtime import MissionRuntime
+            from .scheduler import Scheduler
+            async def work():
+                service=Service(Settings(args.config));runtime=MissionRuntime(service);scheduler=Scheduler(runtime)
+                try:
+                    task=scheduler.start();runtime.recover();await task
+                finally:
+                    await scheduler.close();await runtime.close();await service.close()
+            asyncio.run(work())
+            return
         if args.command == "serve":
             import uvicorn
             from .web import create_app
             if not 1 <= args.port <= 65535:
                 raise ConfigError("Choose a port between 1 and 65535.")
             print(f"Eliot web interface: http://127.0.0.1:{args.port}")
-            uvicorn.run(create_app(args.config), host="127.0.0.1", port=args.port, access_log=False)
+            uvicorn.run(create_app(args.config,external_worker=args.external_worker), host="127.0.0.1", port=args.port, access_log=False)
             return
         if args.command == "doctor":
             from .diagnostics import diagnose
@@ -135,6 +163,14 @@ def main():
                         print(item["id"] + ": " + item["name"])
             elif args.command == "tasks":
                 task_commands(client, args)
+            elif args.command=='schedules':
+                action=args.action or 'list'
+                if action=='list':result=request(client,'GET','/api/schedules')
+                elif action=='create':result=request(client,'POST','/api/schedules',json=json.loads(Path(args.file).read_text()))
+                elif action=='delete':result=request(client,'DELETE',f'/api/schedules/{args.id}')
+                elif action=='trigger':result=request(client,'POST',f'/api/schedules/{args.id}/trigger',json={'event_id':args.event_id})
+                else:result=request(client,'POST',f'/api/schedules/{args.id}/enabled',json={'enabled':action=='enable'})
+                print(json.dumps(result,indent=2))
     except (ConfigError, ValueError, httpx.HTTPError, OSError) as error:
         if isinstance(error, httpx.HTTPError):
             print("Cannot connect to Eliot. Start the backend with: eliot serve", file=sys.stderr)
@@ -172,14 +208,14 @@ def provider_commands(client, args):
         request(client, "DELETE", f"/api/providers/{args.id}")
         print("Provider deleted.")
     else:
-        result = request(client, "POST", f"/api/providers/{args.id}/{action}")
+        request(client, "POST", f"/api/providers/{args.id}/{action}")
         print("Connection test passed." if action == "test" else "Default provider saved.")
 
 
 def task_commands(client, args):
     action = args.action or "list"
     if action == "create":
-        payload = dict(objective=args.objective, workspace=str(Path(args.workspace).resolve()), provider_id=args.provider, persona_id=args.persona, skills=args.skill, targets=args.target, network=args.network, max_steps=args.max_steps, token_budget=args.token_budget, max_workers=args.max_workers)
+        payload = dict(objective=args.objective, workspace=str(Path(args.workspace).resolve()), provider_id=args.provider, persona_id=args.persona, skills=args.skill, targets=args.target, network=args.network, max_steps=args.max_steps, token_budget=args.token_budget, max_workers=args.max_workers, options={**json.loads(args.options),"host_execution":args.host or json.loads(args.options).get("host_execution",False),"file_edit":args.edit or json.loads(args.options).get("file_edit",False)},success_checks=json.loads(args.checks))
         result = request(client, "POST", "/api/tasks", json=payload)
         print("Task started: " + result["id"])
         print("The backend owns this task; disconnecting the terminal does not stop it.")
@@ -209,7 +245,7 @@ def task_commands(client, args):
         except KeyboardInterrupt:
             print("\nStopped watching; task continues in the backend.")
     else:
-        payload = {"max_steps": args.max_steps, "token_budget": args.token_budget} if action == "resume" else None
+        payload = {"max_steps": args.max_steps, "token_budget": args.token_budget,"rebind_provider":args.rebind_provider} if action == "resume" else None
         result = request(client, "POST", f"/api/tasks/{args.id}/{action}", json=payload)
         print(result["status"])
 

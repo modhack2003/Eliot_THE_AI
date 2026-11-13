@@ -3,11 +3,9 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from dataclasses import asdict
 import json
 from pathlib import Path
 import secrets
-from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -22,6 +20,9 @@ from .service import Service
 from .store import BusyError
 from .mission_runtime import MissionRuntime
 from .instructions import CORE_SYSTEM
+from .policy import MissionOptions
+from .contracts import SuccessCheck
+from .scheduler import Scheduler, ScheduleInput
 
 
 class NewSession(BaseModel):
@@ -45,6 +46,8 @@ class NewTask(BaseModel):
     max_steps: int = Field(default=0, ge=0)
     token_budget: int = Field(default=0, ge=0)
     max_workers: int = Field(default=3, ge=1, le=6)
+    options: MissionOptions = Field(default_factory=MissionOptions)
+    success_checks: list[SuccessCheck] = Field(default_factory=list,max_length=30)
 
 
 class PersonaInput(BaseModel):
@@ -57,6 +60,7 @@ class TaskFeedback(BaseModel):
 
 
 class TaskResume(BaseModel):
+    rebind_provider: bool = False
     max_steps: int | None = Field(default=None, ge=0)
     token_budget: int | None = Field(default=None, ge=0)
 
@@ -72,30 +76,42 @@ class Profile(BaseModel):
     timeout_seconds: float = 60
     max_retries: int = 1
     parameters: dict = Field(default_factory=dict)
+    context_chars: int = 80000
+    input_cost_per_million: float | None = None
+    output_cost_per_million: float | None = None
+    vision: bool = False
+    structured_output: bool = False
 
 
 class TemporaryKey(BaseModel):
     api_key: str = Field(min_length=1, max_length=4096)
 
 
-def create_app(config_path=None, gateway=None):
+def create_app(config_path=None, gateway=None, external_worker=False):
     settings = Settings(config_path)
     service = Service(settings, gateway)
-    missions = MissionRuntime(service)
+    missions = MissionRuntime(service,execute_tasks=not external_worker)
+    scheduler = Scheduler(missions)
     csrf_token = secrets.token_urlsafe(32)
     key_tests = set()
 
     @asynccontextmanager
     async def lifespan(app):
         service.store.recover()
-        missions.recover()
-        yield
-        await missions.close()
-        await service.close()
+        if not external_worker:
+            scheduler.start()
+            missions.recover()
+        try:
+            yield
+        finally:
+            await scheduler.close()
+            await missions.close()
+            await service.close()
 
     app = FastAPI(title="Eliot Remastered", version=__version__, lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.service = service
     app.state.missions = missions
+    app.state.scheduler = scheduler
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "[::1]"])
 
     @app.middleware("http")
@@ -260,8 +276,8 @@ def create_app(config_path=None, gateway=None):
         return missions.store.save_persona(persona_id, item.name, item.instructions)
 
     @app.get("/api/tasks")
-    async def task_list():
-        return missions.store.list()
+    async def task_list(limit: int = 50, offset: int = 0):
+        return missions.store.summaries(limit=limit,offset=offset)
 
     @app.post("/api/tasks")
     async def create_task(item: NewTask):
@@ -270,7 +286,7 @@ def create_app(config_path=None, gateway=None):
     @app.get("/api/tasks/{task_id}")
     async def task_detail(task_id: str):
         mission = missions.store.get(task_id)
-        return {**mission, "children": [m for m in missions.store.list(mission["root_id"]) if m["parent_id"] == task_id], "totals": missions.store.totals(mission["root_id"])}
+        return {**mission, "children": [m for m in missions.store.list(mission["root_id"]) if m["parent_id"] == task_id], "totals": missions.store.totals(mission["root_id"]), "metrics":missions.store.metrics(mission["root_id"])}
 
     @app.get("/api/tasks/{task_id}/events")
     async def task_events(task_id: str, after: int = 0):
@@ -281,6 +297,93 @@ def create_app(config_path=None, gateway=None):
     async def task_feedback(task_id: str, item: TaskFeedback):
         missions.store.get(task_id)
         return {"event_id": missions.store.feedback(task_id, item.text)}
+
+    @app.get('/api/model-performance')
+    async def model_performance():
+        from .routing import performance
+        return performance(missions.store)
+
+    @app.get('/api/capabilities')
+    async def capabilities():
+        return missions.tools.registry()
+
+    @app.get('/api/tasks/{task_id}/export')
+    async def export_task(task_id: str):
+        mission=missions.store.get(task_id)
+        members=missions.store.list(mission['root_id'])
+        records=[]
+        for member in members:
+            after=0;events=[]
+            while True:
+                page=missions.store.events(member['id'],after=after,limit=500)
+                events.extend(page)
+                if len(page)<500:break
+                after=page[-1]['id']
+            records.append({'mission':member,'events':events,'actions':missions.store.actions(member['id'])})
+        return JSONResponse({'tasks':records,'metrics':missions.store.metrics(mission['root_id'])},headers={'Content-Disposition':f'attachment; filename="eliot-mission-{task_id}.json"'})
+
+    @app.get('/api/tasks/{task_id}/artifacts')
+    async def artifacts(task_id: str):
+        mission=missions.store.get(task_id)
+        records=[]
+        for member in missions.store.list(mission['root_id']):
+            for action in missions.store.actions(member['id']):
+                if json.loads(action['request'])['tool']=='write_artifact' and action['result'].get('ok'):
+                    records.append({'owner':member['id'],**action['result']['output']})
+        return records
+
+    @app.get('/api/tasks/{task_id}/artifact')
+    async def artifact(task_id: str,path: str):
+        mission=missions.store.get(task_id)
+        supplied=Path(path)
+        owners={m['id'] for m in missions.store.list(mission['root_id'])}
+        if len(supplied.parts)<3 or supplied.parts[0]!='.eliot-artifacts' or supplied.parts[1] not in owners:
+            raise ConfigError('Artifact does not belong to this mission.')
+        target=missions.tools.artifact_path(mission,Path(*supplied.parts[2:]),supplied.parts[1])
+        if not target.is_file():raise KeyError(path)
+        return FileResponse(target,filename=target.name,media_type='application/octet-stream')
+
+    @app.get('/api/tasks/{task_id}/memory')
+    async def task_memory(task_id: str,query: str='',scope: str='project',offset: int=0):
+        return missions.tools.knowledge.recall(missions.store.get(task_id),query,scope,offset=max(0,offset))
+
+    @app.put('/api/tasks/{task_id}/memory/{memory_id}')
+    async def correct_memory(task_id: str,memory_id: str,request: Request):
+        mission=missions.store.get(task_id)
+        payload=await request.json()
+        text=payload.get('text')
+        if not isinstance(text,str) or not 1<=len(text)<=6000:raise ConfigError('Supply corrected memory text of up to 6,000 characters.')
+        with service.store.connection() as db:row=db.execute('SELECT * FROM agent_memory WHERE id=?',(memory_id,)).fetchone()
+        if not row or row['scope_key']!=missions.tools.knowledge.key(mission,row['scope']):raise KeyError(memory_id)
+        saved=missions.tools.knowledge.remember(mission,text,row['source'],row['scope'],row['confidence'])
+        if saved['id']!=memory_id:missions.tools.knowledge.forget(mission,memory_id)
+        return saved
+
+    @app.delete('/api/tasks/{task_id}/memory/{memory_id}')
+    async def delete_memory(task_id: str,memory_id: str):
+        return missions.tools.knowledge.forget(missions.store.get(task_id),memory_id)
+
+    @app.get('/api/schedules')
+    async def schedules():return scheduler.list()
+
+    @app.post('/api/schedules')
+    async def create_schedule(item: ScheduleInput):return scheduler.create(item.model_dump())
+
+    @app.delete('/api/schedules/{schedule_id}')
+    async def delete_schedule(schedule_id: str):return scheduler.delete(schedule_id)
+
+    @app.post('/api/schedules/{schedule_id}/enabled')
+    async def enable_schedule(schedule_id: str,request: Request):
+        payload=await request.json()
+        if type(payload.get('enabled')) is not bool:raise ConfigError('enabled must be a boolean.')
+        return scheduler.set_enabled(schedule_id,payload['enabled'])
+
+    @app.post('/api/schedules/{schedule_id}/trigger')
+    async def trigger_schedule(schedule_id: str,request: Request):
+        payload=await request.json()
+        event_id=payload.get('event_id')
+        if not isinstance(event_id,str):raise ConfigError('Supply a stable event identifier.')
+        return scheduler.trigger(schedule_id,event_id)
 
     @app.post("/api/tasks/{task_id}/{action}")
     async def task_control(task_id: str, action: str, item: TaskResume | None = None):

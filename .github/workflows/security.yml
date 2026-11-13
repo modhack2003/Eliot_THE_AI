@@ -1,0 +1,35 @@
+name: Security and agent evaluation
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '35 3 * * 1'
+permissions:
+  contents: read
+jobs:
+  dependency-and-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -c requirements.lock -e '.[test]' pip-audit ruff bandit detect-secrets
+      - run: python -m pip_audit --local --skip-editable
+      - run: python scripts/check_secrets.py
+      - run: ruff check eliot_app tests --select F
+      - run: bandit -r eliot_app -x eliot_app/bundled_skills -ll
+      - name: Agent behavior evaluations
+        run: python -m pytest -q tests/test_runtime_hardening.py tests/test_autonomy.py tests/test_device_tools.py
+  browser-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -c requirements.lock -e '.[test,browser]'
+      - run: python -m playwright install --with-deps chromium
+      - name: Verify browser to host task and scheduler flow
+        run: python -m pytest -q tests/test_browser_e2e.py

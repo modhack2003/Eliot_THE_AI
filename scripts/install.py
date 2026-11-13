@@ -141,7 +141,8 @@ def install(prefix=None, no_desktop=False):
         # Each attempt has a new final venv path. Relocating a venv breaks its entrypoints.
         # An unsuccessful attempt never changes the active runtime pointer.
         run([sys.executable, "-I", "-m", "venv", runtime])
-        run([python, "-I", "-m", "pip", "install", "--disable-pip-version-check", SOURCE])
+        run([python, "-I", "-m", "pip", "install", "--disable-pip-version-check", "--upgrade", "pip>=26.2"])
+        run([python, "-I", "-m", "pip", "install", "--disable-pip-version-check", "--constraint", SOURCE / "requirements.lock", SOURCE])
         config = config_home / "config.yaml"
         if not config.exists():
             # Exclusively create: a concurrent app/config writer must never be overwritten.

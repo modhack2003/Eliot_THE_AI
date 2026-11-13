@@ -438,6 +438,11 @@ function openProvider(p) {
   $("dialog-title").textContent = p
     ? "Refine the connection."
     : "Make a connection.";
+  $("p-vision").checked = !!p?.vision;
+  $("p-structured").checked = !!p?.structured_output;
+  $("p-context").value = p?.context_chars || 80000;
+  $("p-input-price").value = p?.input_cost_per_million ?? "";
+  $("p-output-price").value = p?.output_cost_per_million ?? "";
   $("p-name").value = p?.name || "";
   $("p-id").value = p?.id || "";
   $("p-url").value = p?.base_url || "";
@@ -482,6 +487,8 @@ $("provider-form").addEventListener("submit", async (event) => {
       streaming: $("p-stream").checked,
       timeout_seconds: Number($("p-timeout").value),
       max_retries: Number($("p-retries").value),
+      context_chars:Number($("p-context").value), vision:$("p-vision").checked, structured_output:$("p-structured").checked,
+      input_cost_per_million:$("p-input-price").value===""?null:Number($("p-input-price").value), output_cost_per_million:$("p-output-price").value===""?null:Number($("p-output-price").value),
       parameters,
     });
     if ($("p-key").value.trim())

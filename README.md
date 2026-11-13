@@ -7,13 +7,23 @@ Connect an OpenAI-compatible Chat Completions endpoint, select its exact model I
 and use your own API key. Local model servers can run without authentication.
 Conversations and run history are stored in SQLite on your machine.
 
-Version **2.0.0a5** improves mission checkpoint recovery and browser reconnection,
+Version **2.0.0a6** improves mission checkpoint recovery and browser reconnection,
 and opens bundled skill references inside the animated workspace. It builds on one-command
 installation and the durable cybersecurity agent core: coordinator/worker
 tasks, typed evidence tools, scoped observations, checkpoints, completion review,
 uploaded personas and 83 default skill modules. Ordinary conversation remains
 separate from task execution. The original broad security-tool integrations
 remain in the source tree for migration.
+
+The next agent layer adds structured dependency plans, operator completion checks,
+source-backed task/project/user memory, direct host command and Python tools,
+versioned edits, optional browser/desktop/vision/voice adapters, persistent schedules,
+role-specific model routing, and mission metrics/export. Execution runs directly on
+the host; no container or execution-isolation layer is added. Enable capabilities
+once per mission through its form, `--host` / `--edit`, or advanced options.
+
+See [the host agent guide](docs/HOST_AGENT.md) and the tracked
+[review and implementation checklist](review_and_roadmap.md).
 
 See [the agent core guide](docs/AGENT_CORE.md) for long-running tasks and
 [third-party notices](THIRD_PARTY_NOTICES.md) for the bundled skill provenance.
@@ -96,12 +106,12 @@ inference offline.
 For an environment-backed key, set it **before** starting the backend:
 
 ```sh
-export ELIOT_API_KEY='your-api-key'
+export ELIOT_API_KEY='your-api-key'  # pragma: allowlist secret
 eliot serve
 ```
 
 ```powershell
-$env:ELIOT_API_KEY = 'your-api-key'
+$env:ELIOT_API_KEY = 'your-api-key'  # pragma: allowlist secret
 eliot serve
 ```
 
@@ -118,8 +128,9 @@ bounded and apply only to rate-limit and selected server-error responses; Eliot
 does not silently forward a failed request to another provider.
 
 Compatibility is with the **Chat Completions protocol**, not every feature of
-every model. Native function calling, images, custom authentication headers and
-the Responses API are not implemented in this alpha. Agent tasks use validated
+every model. Native function calling, custom authentication headers and the Responses API
+are not implemented. PNG/JPEG task observations are supported for profiles explicitly
+marked as vision-capable; optional JSON response mode is available. Agent tasks use validated
 JSON decisions with registered application tools instead. Use a text chat model and the provider's exact
 parameter names. Optional `/models` discovery is not required.
 

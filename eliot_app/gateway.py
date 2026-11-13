@@ -56,6 +56,8 @@ class Gateway:
         if provider.auth == "bearer":
             headers["Authorization"] = f"Bearer {key}"
         body = {"model": provider.model, "messages": messages, "stream": provider.streaming, **provider.parameters}
+        if provider.structured_output and any('Agent mode:' in str(message.get('content','')) for message in messages if message.get('role')=='system'):
+            body['response_format']={'type':'json_object'}
         url = provider.base_url.rstrip("/") + "/chat/completions"
         async with httpx.AsyncClient(timeout=provider.timeout_seconds, transport=self.transport, follow_redirects=False, trust_env=False) as client:
             for attempt in range(provider.max_retries + 1):

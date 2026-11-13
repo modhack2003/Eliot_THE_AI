@@ -8,7 +8,6 @@ from uuid import uuid4
 
 from .config import ConfigError
 from .instructions import DEFAULT_PERSONA
-from .store import BusyError
 
 
 TERMINAL = {"completed", "cancelled", "blocked", "budget_exhausted", "paused"}
@@ -34,6 +33,7 @@ class MissionStore:
                     id INTEGER PRIMARY KEY AUTOINCREMENT, mission_id TEXT NOT NULL REFERENCES missions(id),
                     kind TEXT NOT NULL, data TEXT NOT NULL, created REAL NOT NULL
                 );
+                CREATE INDEX IF NOT EXISTS events_by_mission ON mission_events(mission_id,id);
                 CREATE TABLE IF NOT EXISTS mission_actions(
                     mission_id TEXT NOT NULL REFERENCES missions(id), action_id TEXT NOT NULL,
                     request TEXT NOT NULL, status TEXT NOT NULL, result TEXT NOT NULL DEFAULT '{}',
@@ -82,11 +82,11 @@ class MissionStore:
                 raise KeyError(mission_id)
             return self.unpack(row)
 
-    def list(self, root_id=None):
+    def list(self, root_id=None, limit=200, offset=0):
         with self.store.connection() as db:
             if root_id:
                 return [self.unpack(row) for row in db.execute("SELECT * FROM missions WHERE root_id=? ORDER BY created", (root_id,))]
-            return [self.unpack(row) for row in db.execute("SELECT * FROM missions WHERE parent_id IS NULL ORDER BY created DESC LIMIT 200")]
+            return [self.unpack(row) for row in db.execute("SELECT * FROM missions WHERE parent_id IS NULL ORDER BY created DESC,id LIMIT ? OFFSET ?", (min(200, max(1, limit)), max(0, offset)))]
 
     def recoverable(self):
         with self.store.connection() as db:
@@ -102,7 +102,8 @@ class MissionStore:
         values["updated"] = time.time()
         fields = ",".join(key + "=?" for key in values)
         with self.store.connection() as db:
-            db.execute(f"UPDATE missions SET {fields} WHERE id=?", (*values.values(), mission_id))
+            # Column names are allowlisted above; values are bound.
+            db.execute(f"UPDATE missions SET {fields} WHERE id=?", (*values.values(), mission_id))  # nosec B608
 
     def event(self, mission_id, kind, data):
         with self.store.connection() as db:
@@ -167,3 +168,40 @@ class MissionStore:
                     request["content_truncated"] = len(text)>6000
                 details.append({"id": evidence_id, "request": request, "recorded_result": raw[:6000], "truncated": len(raw)>6000})
         return details
+
+    def summaries(self, limit=50, offset=0):
+        with self.store.connection() as db:
+            rows = db.execute("SELECT id,root_id,parent_id,objective,provider_id,workspace,persona,status,steps,tokens,estimated_usage,reason,created,updated FROM missions WHERE parent_id IS NULL ORDER BY created DESC,id LIMIT ? OFFSET ?", (min(200,max(1,limit)),max(0,offset)))
+            result=[]
+            for row in rows:
+                item=dict(row); persona=json.loads(item['persona'])
+                item['persona']={'id':persona['id'],'name':persona['name']}
+                result.append(item)
+            return result
+
+    def actions(self, mission_id):
+        with self.store.connection() as db:
+            return [{**dict(row),'result':json.loads(row['result'])} for row in db.execute("SELECT * FROM mission_actions WHERE mission_id=? ORDER BY created,action_id",(mission_id,))]
+
+    def observed_evidence(self, mission):
+        excluded={'write_artifact','read_artifact','read_skill','edit_file','rollback_file','remember','recall','forget_memory','read_evidence'}
+        result=[]
+        for action in self.actions(mission['id']):
+            if action['result'].get('ok') and json.loads(action['request'])['tool'] not in excluded:
+                result.append(action['action_id'])
+        for child in self.list(mission['root_id']):
+            if child['parent_id']==mission['id'] and child['status']=='completed' and self.observed_evidence(child):
+                result.append('child:'+child['id'])
+        return result
+
+    def metrics(self, root_id):
+        members=self.list(root_id)
+        with self.store.connection() as db:
+            rows=db.execute("SELECT kind,data FROM mission_events WHERE mission_id IN (SELECT id FROM missions WHERE root_id=?) AND kind IN ('model_usage','tool_metrics','runtime_error')",(root_id,))
+            models=[];tools=[];errors=0
+            for row in rows:
+                data=json.loads(row['data'])
+                if row['kind']=='model_usage': models.append(data)
+                elif row['kind']=='tool_metrics': tools.append(data)
+                else: errors+=1
+        return {'model_calls':len(models),'tool_calls':len(tools),'model_seconds':sum(m.get('seconds',0) for m in models),'tool_seconds':sum(t.get('seconds',0) for t in tools),'cost_usd':sum(m.get('cost_usd') or 0 for m in models),'cost_known':bool(models) and all(m.get('cost_usd') is not None for m in models),'errors':errors,'workers':len(members)-1}

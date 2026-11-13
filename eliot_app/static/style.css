@@ -2509,3 +2509,19 @@ label textarea {
   cursor: pointer;
   padding: 8px 0;
 }
+
+/* Outcome-oriented mission tools. */
+.autonomy-section,.automation-panel {border:1px solid var(--border,#26303c);border-radius:12px;padding:18px;margin:18px 0;background:var(--surface,#10151d)}
+.autonomy-section h3 {margin:0 0 12px;font-size:15px}
+.autonomy-section>a,.autonomy-section>button {display:inline-block;margin:6px 14px 6px 0}
+.plan-steps {padding-left:24px}
+.plan-steps li {padding:10px 4px;border-bottom:1px solid var(--border,#26303c)}
+.plan-steps .badge {margin-left:12px}
+.plan-steps small {display:block;color:var(--muted,#9ca9ba);overflow-wrap:anywhere}
+.memory-fact,.schedule-card {padding:12px 0;border-bottom:1px solid var(--border,#26303c)}
+.memory-fact small {display:block;overflow-wrap:anywhere}
+.memory-fact button,.schedule-card button {margin:8px 12px 0 0}
+#agent-capabilities {font-size:12px;line-height:1.8;overflow-wrap:anywhere}
+.automation-panel summary {cursor:pointer;font-weight:600}
+#task-autonomy input {width:100%;max-width:420px}
+@media(max-width:600px){.composer-tools {flex-wrap:wrap}.autonomy-section {padding:12px}.plan-steps .badge{display:block;width:fit-content;margin:6px 0}}
