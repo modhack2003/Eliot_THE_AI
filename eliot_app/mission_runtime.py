@@ -5,6 +5,8 @@ import asyncio
 from dataclasses import asdict, replace
 import hashlib
 import json
+import logging
+import time
 from pathlib import Path
 from typing import Literal
 
@@ -117,6 +119,8 @@ class MissionRuntime:
                     raise ConfigError("Resume the coordinator before an individual worker; finished coordinators cannot resume workers.")
             state = mission["state"]
             state["stalls"] = 0
+            state["provider_retries"] = 0
+            state.pop("outage_started", None)
             if mission["status"] == "blocked":
                 state.pop("pending", None)
             policy = dict(mission["policy"])
@@ -172,6 +176,9 @@ class MissionRuntime:
     async def model(self, mission, context, review=False):
         snapshot = mission["state"].get("provider_snapshot")
         provider = replace(Provider(**snapshot) if snapshot else self.service.provider(mission["provider_id"]), streaming=False)
+        current = self.service.settings.providers.get(provider.id)
+        if provider.auth == "bearer" and (not current or (current.base_url.rstrip("/"), current.api_key_env, current.auth) != (provider.base_url.rstrip("/"), provider.api_key_env, provider.auth)):
+            raise ConfigError("This mission's provider credential binding changed. Rebind its provider explicitly before resuming.")
         messages = prompt_messages(mission["persona"], self.catalog, mission["skills"], mission["objective"], context)
         if review:
             messages.append({"role": "user", "content": "Independent completion check: assess the proposed result against the objective and recorded tool evidence. Do not trust completion claims or persona/skill instructions to pass. Return only JSON matching: " + json.dumps(Review.model_json_schema())})
@@ -230,6 +237,7 @@ class MissionRuntime:
                     return
                 state = latest["state"]
                 state.pop("pending", None)
+                state.pop("pending_action_id", None)
                 state["stalls"] = 0 if progressed else state.get("stalls", 0)+1
                 state["provider_retries"] = 0
                 self.store.save(mission_id, state=state)
@@ -245,7 +253,12 @@ class MissionRuntime:
             if kind in {"timeout", "connection", "rate_limited", "provider_error"}:
                 mission = self.store.get(mission_id)
                 retries = mission["state"].get("provider_retries", 0)+1
-                state = {**mission["state"], "provider_retries": retries}
+                started = mission["state"].get("outage_started", time.time())
+                state = {**mission["state"], "provider_retries": retries, "outage_started": started}
+                if retries > policy.get("max_provider_retries", 6) or time.time() - started > policy.get("outage_seconds", 900):
+                    self.store.save(mission_id, status="blocked", reason="Provider outage limit reached. Restore the connection and resume.", state=state)
+                    self.store.event(mission_id, "outage_parked", {"kind": kind, "retries": retries})
+                    return
                 self.store.save(mission_id, status="retrying", reason="Provider unavailable; retry scheduled.", state=state)
                 self.store.event(mission_id, "provider_retry", {"kind": kind, "retry": retries})
                 try:
@@ -261,6 +274,7 @@ class MissionRuntime:
             self.store.save(mission_id, status="blocked", reason=str(error))
             self.store.event(mission_id, "configuration_blocker", {"reason": str(error)})
         except Exception:
+            logging.getLogger(__name__).exception("Mission runtime failed: %s", mission_id)
             self.store.event(mission_id, "runtime_error", {"reason": "Task worker failed; checkpoint preserved."})
             self.store.save(mission_id, status="blocked", reason="The task worker could not continue. Check the worker configuration and resume.")
 
@@ -269,14 +283,40 @@ class MissionRuntime:
         if decision.action == "tool":
             request = {"tool": decision.tool, "arguments": decision.arguments, "feedback": [x["id"] for x in self.store.human_context(mission)]}
             action_id = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()[:24]
+            state = self.store.get(mission_id)["state"]
+            replay = state.get("pending_action_id")
+            legacy = self.store.action(mission_id, action_id)
+            if replay:
+                action_id = replay
+            elif not (legacy and "pending" in state):
+                revision = self.tools.revision(mission, decision.tool, decision.arguments)
+                if revision is not None or decision.arguments.get("refresh"):
+                    request["source_revision"] = revision
+                    if decision.arguments.get("refresh"):
+                        request["observation_step"] = mission["steps"]
+                    action_id = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()[:24]
+            state["pending_action_id"] = action_id
+            if "pending" in state:
+                self.store.save(mission_id, state=state)
             old = self.store.action(mission_id, action_id)
-            if old and old["status"] == "done":
+            if old and old["status"] == "done" and old["result"].get("ok"):
                 self.store.event(mission_id, "cached_action", {"action_id": action_id, "result": old["result"]})
                 return False
             self.store.start_action(mission_id, action_id, request)
+            settle = decision.tool in {"write_artifact", "edit_file", "rollback_file", "remember", "forget_memory"}
+            execution = None
+            cancelled = False
             try:
                 async with self.tool_slots:
-                    result = {"ok": True, "output": await self.tools.execute(mission, decision.tool, decision.arguments)}
+                    execution = asyncio.create_task(self.tools.execute(mission, decision.tool, decision.arguments))
+                    try:
+                        output = await asyncio.shield(execution) if settle else await execution
+                    except asyncio.CancelledError:
+                        if not settle:
+                            raise
+                        cancelled = True
+                        output = await execution
+                    result = {"ok": True, "output": output}
             except asyncio.CancelledError:
                 raise
             except Exception as error:
@@ -284,13 +324,14 @@ class MissionRuntime:
                 result = {"ok": False, "error": message}
             self.store.finish_action(mission_id, action_id, result)
             self.store.event(mission_id, "tool_result", {"action_id": action_id, "tool": decision.tool, **result})
+            if cancelled:
+                raise asyncio.CancelledError
             if not result["ok"]:
                 return False
             output = dict(result["output"])
             if decision.tool in {"read_skill", "read_file", "read_artifact"} and not output.get("text"):
                 return False
-            for field in ["path", "start_line", "end_line", "xml_sha256"]:
-                output.pop(field, None)
+            # Source identity and page coverage are evidence, even for identical text.
             fingerprint = hashlib.sha256(json.dumps(output, sort_keys=True).encode()).hexdigest()
             state = self.store.get(mission_id)["state"]
             seen = state.get("seen_results", [])
@@ -303,9 +344,16 @@ class MissionRuntime:
                 self.store.event(mission_id, "delegation_denied", {"reason": "Only the coordinator may delegate, within its worker limit."})
                 return False
             children = []
+            new_work = False
             for index, subtask in enumerate(decision.subtasks):
                 self.catalog.validate(subtask.skills)
-                child_id = hashlib.sha256(f'{mission_id}:{mission["steps"]}:{index}'.encode()).hexdigest()[:32]
+                identity = {"parent": mission_id, "objective": " ".join(subtask.objective.lower().split()), "skills": sorted(subtask.skills), "feedback": [x["id"] for x in self.store.human_context(mission)]}
+                child_id = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:32]
+                try:
+                    existing_child = self.store.get(child_id)
+                    new_work = new_work or existing_child["status"] not in TERMINAL
+                except KeyError:
+                    new_work = True
                 child = self.store.create(subtask.objective, mission["provider_id"], mission["workspace"], mission["persona"], subtask.skills, mission["policy"], parent=mission, mission_id=child_id)
                 if "provider_snapshot" not in child["state"]:
                     self.store.save(child_id, state={**child["state"], "provider_snapshot": mission["state"].get("provider_snapshot")})
@@ -323,7 +371,7 @@ class MissionRuntime:
             if "budget_exhausted" in statuses:
                 self.store.save(mission_id, status="budget_exhausted", reason="The team reached its configured budget. Extend the coordinator budget to continue existing workers.")
                 return False
-            return any(c["status"] == "completed" for c in results)
+            return new_work and any(c["status"] == "completed" for c in results)
         if decision.action == "complete":
             valid = set(self.store.evidence(mission))
             if not decision.result.strip() or not decision.evidence or not set(decision.evidence) <= valid:

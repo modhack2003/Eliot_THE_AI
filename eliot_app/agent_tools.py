@@ -55,6 +55,7 @@ class ReadSkill(Input):
 
 class HttpObserve(Input):
     url: str = Field(max_length=2048)
+    refresh: bool = False
 
 
 class NmapServices(Input):
@@ -110,6 +111,40 @@ class Tools:
             raise ConfigError("That path is excluded from task evidence.")
         return path
 
+    def artifact_path(self, mission, relative, owner=None):
+        root = Path(mission["workspace"]).resolve()
+        supplied = Path(relative)
+        if supplied.is_absolute() or ".." in supplied.parts:
+            raise ConfigError("Artifacts must stay inside this task's artifact directory.")
+        artifact_root = root / ".eliot-artifacts" / (owner or mission["id"])
+        path = artifact_root / supplied
+        for candidate in [root / ".eliot-artifacts", artifact_root, *path.parents, path]:
+            if candidate == root or not candidate.is_relative_to(root):
+                continue
+            if candidate.is_symlink() or getattr(candidate, "is_junction", lambda: False)():
+                raise ConfigError("Artifact paths cannot contain symlinks or junctions.")
+        if not path.resolve().is_relative_to(artifact_root):
+            raise ConfigError("Artifacts must stay inside this task's artifact directory.")
+        if any(part.startswith(".env") or part.endswith((".pem", ".key")) or part in DENIED - {".eliot-artifacts"} for part in supplied.parts):
+            raise ConfigError("That path is excluded from task evidence.")
+        return path
+
+    def revision(self, mission, name, arguments):
+        """Version observation inputs, separately from replaying a committed step."""
+        if name in {"read_file", "file_info"}:
+            try:
+                path = self.path(mission, arguments.get("path", ""))
+                stat = path.stat()
+                return [stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns]
+            except (OSError, ConfigError):
+                return "unavailable"
+        if name in {"list_files", "search_files"}:
+            try:
+                return [(str(p.relative_to(mission["workspace"])), p.stat().st_size, p.stat().st_mtime_ns) for p in self.files(mission, arguments.get("path", "."))]
+            except (OSError, ConfigError):
+                return "unavailable"
+        return None
+
     def files(self, mission, base="."):
         root = self.path(mission, base)
         if not root.is_dir():
@@ -144,6 +179,8 @@ class Tools:
             return await self.http_observe(mission, **args)
         if name == "nmap_services":
             return await self.nmap_services(mission, **args)
+        # Atomic local writes settle before cancellation is acknowledged. The runtime
+        # shields and journals writes; read-only thread results may be discarded.
         return await asyncio.to_thread(self.local, mission, name, args)
 
     def local(self, mission, name, args):
@@ -169,11 +206,9 @@ class Tools:
             return {"matches": matches, "at_limit": False}
         if name == "write_artifact":
             root = Path(mission["workspace"]).resolve()
-            artifact_root = (root / ".eliot-artifacts" / mission["id"]).resolve()
-            path = (artifact_root / args["path"]).resolve()
-            if not artifact_root.is_relative_to(root) or not path.is_relative_to(artifact_root) or Path(args["path"]).is_absolute():
-                raise ConfigError("Artifacts must stay inside this task's artifact directory.")
+            path = self.artifact_path(mission, args["path"])
             path.parent.mkdir(parents=True, exist_ok=True)
+            self.artifact_path(mission, args["path"])
             raw = args["content"].encode("utf-8")
             descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=".eliot-write-")
             try:
@@ -191,10 +226,11 @@ class Tools:
             return {"path": str(path.relative_to(root)), "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
         if name == "read_artifact":
             root = Path(mission["workspace"]).resolve()
-            path = (root / args["path"]).resolve()
+            supplied = Path(args["path"])
             owners = [m["id"] for m in self.task_graph(mission["root_id"])] if self.task_graph else [mission["id"]]
-            if not any(path.is_relative_to((root/".eliot-artifacts"/owner).resolve()) and (root/".eliot-artifacts"/owner).resolve().is_relative_to(root) for owner in owners):
+            if supplied.is_absolute() or len(supplied.parts) < 3 or supplied.parts[0] != ".eliot-artifacts" or supplied.parts[1] not in owners:
                 raise ConfigError("The artifact does not belong to this task graph.")
+            path = self.artifact_path(mission, Path(*supplied.parts[2:]), supplied.parts[1])
         else:
             path = self.path(mission, args["path"])
         if not path.is_file():
@@ -209,12 +245,12 @@ class Tools:
         text = "\n".join(f"{i}: {lines[i-1]}" for i in range(args["start_line"], min(len(lines)+1, args["start_line"]+args["limit"])))
         return {"path": args["path"], "text": text[:12_000], "total_lines": len(lines), "start_line": args["start_line"], "truncated": len(text) > 12_000}
 
-    async def http_observe(self, mission, url):
+    async def http_observe(self, mission, url, refresh=False):
         parsed = urlsplit(url)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password or parsed.fragment:
             raise ConfigError("Use an HTTP(S) URL without embedded credentials or fragments.")
         self.scoped(mission, parsed.hostname)
-        async with httpx.AsyncClient(timeout=20, follow_redirects=False, trust_env=False, transport=self.http_transport) as client:
+        async with asyncio.timeout(30), httpx.AsyncClient(timeout=20, follow_redirects=False, trust_env=False, transport=self.http_transport) as client:
             async with client.stream("GET", url, headers={"User-Agent": "Eliot-Authorized-Observation/2"}) as response:
                 raw = bytearray()
                 async for chunk in response.aiter_bytes():
