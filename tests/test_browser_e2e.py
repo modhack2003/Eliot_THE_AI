@@ -22,7 +22,7 @@ import pytest
     reason="Optional Playwright/system Chromium integration dependencies are missing",
 )
 def test_browser_host_mission_and_schedule(tmp_path):
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import sync_playwright, expect
 
     with socket.socket() as candidate:
         candidate.bind(("127.0.0.1", 0))
@@ -82,9 +82,8 @@ def test_browser_host_mission_and_schedule(tmp_path):
                 page.locator("#m-check-file").fill("verified.txt")
                 page.locator("#m-check-text").fill("completed host task")
                 page.locator("#launch-mission").click()
-                page.wait_for_function(
-                    "document.querySelector('#task-status').textContent === 'completed'",
-                    timeout=30000,
+                expect(page.locator("#task-status")).to_have_text(
+                    "completed", timeout=30000
                 )
                 assert (tmp_path / "verified.txt").read_text() == "completed host task"
                 assert "Generate result" in page.locator("#task-autonomy").inner_text()
@@ -114,3 +113,70 @@ def test_browser_host_mission_and_schedule(tmp_path):
             except subprocess.TimeoutExpired:
                 server.kill()
                 server.wait()
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("playwright") is None
+    or (
+        not (shutil.which("chromium") or shutil.which("google-chrome"))
+        and os.environ.get("CI") != "true"
+    ),
+    reason="Optional browser dependencies are missing",
+)
+async def test_real_host_browser_adapter_inspects_fills_clicks_and_captures(tmp_path):
+    import asyncio
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    import threading
+    from test_autonomy import paused
+
+    class Lab(BaseHTTPRequestHandler):
+        def do_GET(self):
+            raw = b'<html><head><title>Local lab</title></head><body><input id="q"><button id="go" onclick="document.getElementById(\'out\').textContent=document.getElementById(\'q\').value">Apply</button><p id="out">Waiting</p></body></html>'
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *args):
+            pass
+
+    lab = ThreadingHTTPServer(("127.0.0.1", 0), Lab)
+    thread = threading.Thread(target=lab.serve_forever, daemon=True)
+    thread.start()
+    runtime, mission = await paused(
+        tmp_path, network=True, targets=["127.0.0.1"], options={"browser": True}
+    )
+    try:
+        try:
+            result = await runtime.tools.execute(
+                mission,
+                "browser_action",
+                {"action": "navigate", "url": f"http://127.0.0.1:{lab.server_port}/"},
+            )
+        except Exception as error:
+            if (
+                "socket() failed: Operation not permitted" in str(error)
+                and os.environ.get("CI") != "true"
+            ):
+                pytest.skip(
+                    "Local Chromium sockets are denied; CI runs this integration."
+                )
+            raise
+        assert result["title"] == "Local lab"
+        await runtime.tools.execute(
+            mission,
+            "browser_action",
+            {"action": "fill", "selector": "#q", "text": "Verified browser tool"},
+        )
+        result = await runtime.tools.execute(
+            mission, "browser_action", {"action": "click", "selector": "#go"}
+        )
+        assert "Verified browser tool" in result["text"]
+        image = await runtime.tools.execute(
+            mission, "browser_action", {"action": "screenshot"}
+        )
+        assert (tmp_path / image["image_path"]).is_file()
+    finally:
+        await runtime.close()
+        await asyncio.to_thread(lab.shutdown)
+        lab.server_close()
