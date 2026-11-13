@@ -29,10 +29,10 @@ Owner direction: execute on the host directly. Do not introduce containers, virt
 - [x] 25 Cybersecurity evidence import and normalized findings
 - [x] 26 Specialist roles and model routing
 - [x] 27 Versioned file edits and rollback
-- [ ] 28 Plan/evidence/memory/schedule dashboard
+- [x] 28 Plan/evidence/memory/schedule dashboard
 - [x] 29 Voice input/output and vision-capable provider messages
 - [x] 30 Optional robotics bridge and emergency stop
-- [ ] 31 Documentation, full validation and GitHub push
+- [x] 31 Documentation, full validation and GitHub push
 
 Each item is checked only after implementation and relevant automated validation. Optional adapters require their documented dependencies; live hardware/provider/desktop validation is tracked separately from fixture tests.
 
@@ -44,11 +44,12 @@ Each item is checked only after implementation and relevant automated validation
 - Optional adapters: host Playwright browser, PyAutoGUI desktop, PNG/JPEG model observations, browser speech controls and an HTTP robotics bridge. Automated adapter fixtures pass; no physical hardware, live speech or paid provider reasoning test was performed.
 - Security checks: production dependency constraints, weekly dependency updates, pip-audit (no known vulnerabilities after updating pip), Bandit medium/high checks and first-party credential scanning. Typed host process/tool policy is enforced; this is explicitly not OS isolation.
 - Open UI PR overlap reviewed: #3 and #4 both replace neural.js and modify style.css; #4 additionally changes app.js/workspace.js and adds eliot-core.js. They are alternative visual implementations with overlapping files. Neither was merged or overwritten by this agent-runtime work.
-- Browser/dashboard end-to-end validation is pending GitHub CI. Local Chromium startup was denied by this execution environment's native-socket policy; the test reports this specific local limitation as a skip and fails on browser startup problems in CI.
+- Final validation: 110 core Python tests and 11 JavaScript transport tests pass locally. GitHub CI passes Linux/Windows test matrices, Linux/Windows installation, dependency/secret/static security checks, and both real browser integration tests (2 passed). The browser tests verify UI → API → host output → plan/outcome verification → dashboard/scheduler, plus the actual browser adapter's navigation/fill/click/screenshot behavior. Validated implementation commit: `3bac6b5a5926f3a1b7bf7e87534772dd5bf56cc6`.
+- GitHub delivery: implementation is pushed to `codex/autonomous-agent-roadmap` in [PR #5](https://github.com/modhack2003/Eliot_THE_AI/pull/5). CI evidence: [Tests](https://github.com/modhack2003/Eliot_THE_AI/actions/runs/43520232192), [Installation](https://github.com/modhack2003/Eliot_THE_AI/actions/runs/43520232083), [Security and browser evaluation](https://github.com/modhack2003/Eliot_THE_AI/actions/runs/43520232242). The final documentation commit records those results; product code is unchanged by that documentation update.
 
-### Remaining live validation
+### Integration validation
 
-- [ ] Complete the browser → API → host output → plan verification → dashboard/scheduler flow in GitHub CI.
+- [x] Complete the browser → API → host output → plan verification → dashboard/scheduler flow in GitHub CI; both browser integration tests passed.
 - [ ] Validate native speech and desktop interaction on the operator's computer.
 - [ ] Evaluate planning and vision with the chosen live model/provider.
 - [ ] Validate real nmap cancellation on the intended Kali host.
