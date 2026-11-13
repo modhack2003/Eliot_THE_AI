@@ -39,6 +39,12 @@ class Provider:
     max_retries: int = 1
     parameters: dict = field(default_factory=dict)
 
+    context_chars: int = 80000
+    input_cost_per_million: float | None = None
+    output_cost_per_million: float | None = None
+    vision: bool = False
+    structured_output: bool = False
+
     def __post_init__(self):
         if any(not isinstance(value, str) for value in (self.id, self.name, self.base_url, self.model, self.api_key_env, self.auth)):
             raise ConfigError("Provider identity, endpoint, model and authentication fields must be text.")
@@ -69,6 +75,13 @@ class Provider:
             raise ConfigError("Request timeout must be between 1 and 300 seconds.")
         if type(self.max_retries) is not int or not 0 <= self.max_retries <= 2:
             raise ConfigError("Retries must be between 0 and 2.")
+        if type(self.context_chars) is not int or not 12000<=self.context_chars<=2000000:
+            raise ConfigError('Context size must be between 12,000 and 2,000,000 characters.')
+        for price in (self.input_cost_per_million,self.output_cost_per_million):
+            if price is not None and (type(price) not in {int,float} or not 0<=price<=100000):
+                raise ConfigError('Model prices must be finite nonnegative numbers.')
+        if type(self.vision) is not bool or type(self.structured_output) is not bool:
+            raise ConfigError('Model capability flags must be booleans.')
         # Explicit generation controls cover ordinary compatible chat servers.
         allowed = {"temperature", "top_p", "max_tokens", "max_completion_tokens", "seed", "presence_penalty", "frequency_penalty", "reasoning_effort"}
         if not isinstance(self.parameters, dict) or set(self.parameters) - allowed:

@@ -205,7 +205,9 @@ function renderOverview() {
   updateActivity();
 }
 async function refreshMissions() {
-  const items = await api("/api/tasks");
+  const items = await api(`/api/tasks?limit=200&offset=0`);
+  const ids = new Set(items.map(item => item.id));
+  items.push(...missions.slice(200).filter(item => !ids.has(item.id)));
   const signature = JSON.stringify(items);
   missions = items;
   if (signature !== missionSignature) {
@@ -315,6 +317,7 @@ function renderTask(task) {
           : "Coordinator · no workers delegated yet",
       ),
     );
+  document.dispatchEvent(new CustomEvent("eliot-task", {detail:task}));
   for (const child of task.children) {
     const row = node("div", "worker");
     const inspect = button("Inspect ↗", () => selectTask(child.id));
@@ -376,6 +379,7 @@ function openMission() {
   $("m-targets").required = false;
   fillSelect("m-provider", profiles, $("provider-select").value);
   fillSelect("m-persona", personas, $("chat-persona").value);
+  for (const id of ["m-worker-model", "m-reviewer-model"]) { $(id).replaceChildren(new Option("Use mission model", ""), ...profiles.map(p => new Option(p.name,p.id))); }
   $("m-skills").replaceChildren(
     ...skills.map(
       (s) =>
@@ -414,6 +418,8 @@ $("mission-form").onsubmit = async (event) => {
             .map((t) => t.trim())
             .filter(Boolean)
         : [],
+      options: {...JSON.parse($("m-options").value || "{}"), host_execution:$("m-host").checked, file_edit:$("m-edit").checked, browser:$("m-browser").checked, desktop:$("m-desktop").checked, wall_seconds:Number($("m-wall").value),max_tool_calls:Number($("m-tool-budget").value),worker_provider_id:$("m-worker-model").value||null,reviewer_provider_id:$("m-reviewer-model").value||null},
+      success_checks:$("m-check-file").value.trim() ? [{kind:$("m-check-text").value ? "file_contains":"file_exists",path:$("m-check-file").value.trim(),text:$("m-check-text").value}] : [],
       max_workers: Number($("m-workers").value),
       max_steps: Number($("m-steps").value),
       token_budget: Number($("m-tokens").value),

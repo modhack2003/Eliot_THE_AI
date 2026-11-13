@@ -151,7 +151,7 @@ def test_config_round_trip_and_environment_path(tmp_path, monkeypatch):
     assert Settings().default_provider == "one"
 
 
-@pytest.mark.parametrize("changes", [dict(base_url="http://public.example/v1"), dict(base_url="https://user:secret@example.com/v1"), dict(base_url="https://example.com/v1?key=secret"), dict(parameters={"messages": []}), dict(parameters={"max_tokens": 3, "max_completion_tokens": 4}), dict(max_retries=10), dict(id="bad/id")])
+@pytest.mark.parametrize("changes", [dict(base_url="http://public.example/v1"), dict(base_url="https://user:secret@example.com/v1"), dict(base_url="https://example.com/v1?key=secret"), dict(parameters={"messages": []}), dict(parameters={"max_tokens": 3, "max_completion_tokens": 4}), dict(max_retries=10), dict(id="bad/id")])  # pragma: allowlist secret
 def test_invalid_provider(changes):
     with pytest.raises(ConfigError):
         profile(**changes)

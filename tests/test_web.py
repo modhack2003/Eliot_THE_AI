@@ -1,5 +1,4 @@
 import json
-import time
 
 from fastapi.testclient import TestClient
 import httpx
@@ -29,7 +28,7 @@ def workspace(tmp_path):
 def test_complete_web_session_and_export(workspace):
     client, app, requests, tmp_path = workspace
     assert client.put("/api/providers/test", json=profile_data()).status_code == 200
-    assert client.put("/api/providers/test/key", json={"api_key":"test-private-key"}).status_code == 200
+    assert client.put("/api/providers/test/key", json={"api_key":"test-private-key"}).status_code == 200  # pragma: allowlist secret
     session = client.post("/api/sessions", json={}).json()
     run = client.post(f'/api/sessions/{session["id"]}/runs', json={"content":"hello"}).json()
     with client.stream("GET", f'/api/runs/{run["id"]}/events') as response:

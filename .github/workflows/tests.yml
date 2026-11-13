@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install -e ".[test]"
+      - run: python -m pip install -c requirements.lock -e ".[test]"
       - run: python -m pytest -q
       - uses: actions/setup-node@v4
         with:
@@ -23,5 +23,6 @@ jobs:
           node --check eliot_app/static/workspace.js
           node --check eliot_app/static/neural.js
           node --check eliot_app/static/transport.js
+          node --check eliot_app/static/autonomy.js
       - name: Test connection recovery
         run: node --test tests/javascript/transport.test.cjs

@@ -1,4 +1,6 @@
-# Durable cybersecurity task core — 2.0.0a2
+# Durable cybersecurity task core
+
+For the 2.0.0a6 host execution, plans, outcome checks, memory, scheduling and optional device adapters, see [HOST_AGENT.md](HOST_AGENT.md). The original evidence-tool design below describes the foundation; enabled host execution now adds command and Python tools.
 
 The terminal and HTTP API now run persistent cybersecurity tasks separately from
 ordinary conversation. Work is owned by the backend, not the terminal connection.
@@ -55,8 +57,7 @@ The initial tools are:
 | `http_observe` | One unauthenticated GET to an explicitly scoped host, with bounded content and no redirect following. |
 | `nmap_services` | TCP connect and light service discovery for one scoped host and up to 128 explicit ports; no vulnerability scripts. Requires nmap on the Kali/Linux worker. |
 
-Tool inputs are validated independently of model instructions. No generic shell
-tool or implicit execution of imported skill scripts exists. Writes are confined
+Tool inputs are validated independently of model instructions. Host execution is opt-in and described in HOST_AGENT.md; imported skill scripts are never executed implicitly. Writes are confined
 to task artifacts, and child agents inherit their parent's workspace and network
 scope. This is application-level validation, not a kernel/container sandbox.
 Real nmap execution and subprocess cancellation still need validation on Kali;

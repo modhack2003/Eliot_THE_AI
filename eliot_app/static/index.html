@@ -14,6 +14,7 @@
     <script src="/static/app.js" defer></script>
     <script src="/static/workspace.js" defer></script>
     <script src="/static/neural.js" defer></script>
+    <script src="/static/autonomy.js" defer></script>
   </head>
   <body data-activity="idle">
     <svg
@@ -300,7 +301,7 @@
                   placeholder="Ask a question. Explore an idea. Start with a signal…"
                 ></textarea>
                 <div class="composer-bottom">
-                  <div class="composer-tools">
+                  <div class="composer-tools"><button type="button" id="voice-input" class="text-button" aria-label="Dictate a message">Microphone</button><button type="button" id="voice-output" class="text-button">Read latest</button><button type="button" id="voice-stop" class="text-button" hidden>Stop voice</button>
                     <span class="composer-mode"
                       ><svg class="icon"><use href="#i-chat" /></svg>
                       Conversation</span
@@ -359,6 +360,7 @@
                 </button>
               </div>
             </div>
+            <details class="automation-panel"><summary>Scheduled missions and capabilities</summary><div id="agent-capabilities"></div><div id="schedule-list"></div><form id="schedule-form"><label>Schedule definition <span class="optional">JSON</span><textarea id="schedule-definition" rows="6" required placeholder='{"name":"Daily review","interval_seconds":86400,"task":{"objective":"Review evidence","workspace":"/path/to/project"}}'></textarea></label><button type="submit" class="secondary-button">Create schedule</button><button type="button" id="refresh-schedules" class="text-button">Refresh</button></form></details>
             <div class="mission-controls">
               <label class="search-field"
                 ><svg class="icon"><use href="#i-search" /></svg
@@ -383,7 +385,7 @@
                 ↻
               </button>
             </div>
-            <div id="mission-list" class="mission-list"></div>
+            <div id="mission-list" class="mission-list"></div><button id="older-missions" type="button" class="text-button">Load older missions</button>
             <section
               id="mission-detail"
               class="mission-detail"
@@ -409,6 +411,7 @@
               <pre id="task-result" class="task-result" hidden></pre>
               <div class="section-label">AGENT TEAM</div>
               <div id="task-children" class="worker-list"></div>
+              <div id="task-autonomy"></div>
               <div class="section-label">ACTIVITY & EVIDENCE</div>
               <div id="task-events" class="event-list"></div>
               <form id="feedback-form" class="feedback-form">
@@ -671,6 +674,10 @@
         >
         <details>
           <summary>Advanced model settings</summary>
+          <label class="checkbox-label"><input type="checkbox" id="p-vision" /> Model accepts images</label>
+          <label class="checkbox-label"><input type="checkbox" id="p-structured" /> Model supports JSON response mode</label>
+          <label>Context character budget<input id="p-context" type="number" min="12000" max="2000000" value="80000" /></label>
+          <div class="form-row"><label>Input price (USD / million tokens)<input id="p-input-price" type="number" min="0" step="any" /></label><label>Output price (USD / million tokens)<input id="p-output-price" type="number" min="0" step="any" /></label></div>
           <div class="form-row">
             <label
               >Timeout (seconds)<input
@@ -779,6 +786,20 @@
             placeholder="One hostname or IP per line. No URLs or wildcards."
           ></textarea>
         </label>
+        <details>
+          <summary>Execution and completion</summary>
+          <p class="field-note">Tools run directly on this machine. Choose capabilities once for this mission.</p>
+          <label class="checkbox-label"><input type="checkbox" id="m-host" /> Host commands and Python</label>
+          <label class="checkbox-label"><input type="checkbox" id="m-edit" /> Versioned workspace edits</label>
+          <label class="checkbox-label"><input type="checkbox" id="m-browser" /> Browser control (requires network targets)</label>
+          <label class="checkbox-label"><input type="checkbox" id="m-desktop" /> Desktop control</label>
+          <div class="form-row"><label>Time budget (seconds, 0 = unlimited)<input id="m-wall" type="number" min="0" value="0" /></label><label>Tool-call budget (0 = unlimited)<input id="m-tool-budget" type="number" min="0" value="0" /></label></div>
+          <label>Required output file <span class="optional">optional</span><input id="m-check-file" placeholder="report.md" /></label>
+          <label>Required text in that file <span class="optional">optional</span><input id="m-check-text" /></label>
+          <label>Specialist worker model<select id="m-worker-model"><option value="">Use mission model</option></select></label>
+          <label>Reviewer model<select id="m-reviewer-model"><option value="">Use mission model</option></select></label>
+          <label>Additional permissions and budgets <span class="optional">JSON object</span><textarea id="m-options" rows="3" placeholder='{"ports":[443],"url_paths":["/api"],"cost_budget_usd":1}'></textarea></label>
+        </details>
         <details>
           <summary>Skills and usage settings</summary>
           <label

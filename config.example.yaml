@@ -7,7 +7,7 @@ providers:
     name: My API provider
     base_url: https://api.openai.com/v1
     model: replace-with-your-exact-model-id
-    api_key_env: ELIOT_API_KEY
+    api_key_env: ELIOT_API_KEY  # pragma: allowlist secret
     auth: bearer
     streaming: true
     timeout_seconds: 60
